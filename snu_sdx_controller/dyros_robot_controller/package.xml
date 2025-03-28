@@ -1,0 +1,24 @@
+<package format="3">
+  <name>dyros_robot_controller</name>
+  <version>0.1.0</version>
+  <description>FR3 robot controller with C++ binding and Python interface.</description>
+  <maintainer email="example@example.com">Your Name</maintainer>
+  <license>Apache License 2.0</license>
+
+  <!-- Buildtool -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <!-- Dependencies -->
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+  <depend>Eigen3</depend>
+  <depend>pinocchio</depend>
+  <depend>mujoco_ros_sim</depend> <!-- 혹은 필요 시 -->
+
+  <export>
+    <!-- <build_type>ament_python</build_type> -->
+    <build_type>ament_cmake</build_type>
+    <!-- <build_type>ament_cmake_python</build_type> -->
+  </export>
+</package>

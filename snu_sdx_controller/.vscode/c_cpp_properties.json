@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/include/eigen3",
+                "/opt/ros/humble/include/**",
+                "/usr/lib/python3/dist-packages/numpy/core/include",
+                "/opt/openrobots/include/**",
+                "/usr/include/python3.10",
+                "${workspaceFolder}/dyros_robot_controller/fr3_controller/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
