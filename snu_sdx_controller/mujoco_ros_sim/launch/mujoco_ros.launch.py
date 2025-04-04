@@ -7,7 +7,7 @@ def generate_launch_description():
     # 런치 아규먼트들
     robot_name_arg = DeclareLaunchArgument(
         'robot_name',
-        default_value='franka_fr3',
+        default_value='franka_fr3_torque',
         description='Name of the robot model to be used in MuJoCo'
     )
 

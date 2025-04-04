@@ -39,7 +39,8 @@ setup(
     entry_points={
         'console_scripts': [
             # ros2 run mujoco_ros_sim mujoco_ros_sim -> mujoco_ros_sim.py 의 main
-            'mujoco_ros_sim = mujoco_ros_sim.mujoco_ros_sim:main'
+            'mujoco_ros_sim = mujoco_ros_sim.mujoco_ros_sim:main',
+            'keyboard_interface = mujoco_ros_sim.keyboard_interface:main'
         ],
     },
 )

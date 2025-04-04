@@ -54,6 +54,21 @@ namespace FR3Controller
         return true;
     }
 
+    VectorXd RobotData::getq()
+    {
+        return q_;
+    }
+
+    VectorXd RobotData::getqdot()
+    {
+        return qdot_;
+    }
+    
+    VectorXd RobotData::gettau()
+    {
+        return tau_;
+    }
+
     bool RobotData::updateKinematics(const VectorXd& q, const VectorXd& qdot)
     {
         if(q.size() != model_.nq)

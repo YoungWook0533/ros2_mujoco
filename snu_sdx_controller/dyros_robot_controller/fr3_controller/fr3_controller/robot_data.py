@@ -94,6 +94,33 @@ class FR3RobotData(RobotDataInterface):
             self.node.get_logger().error("[FR3RobotData] Failed to update robot state.")
 
 # ==================================================================================================
+    def getq(self) -> np.ndarray:
+        """
+        Retrieves joint positions from the robot data wrapper.
+        
+        Returns:
+            np.ndarray: Array containing joint positions.
+        """
+        return self.robot_data.getq()
+    
+    def getqdot(self) -> np.ndarray:
+        """
+        Retrieves joint velocities from the robot data wrapper.
+        
+        Returns:
+            np.ndarray: Array containing joint velocities.
+        """
+        return self.robot_data.getqdot()
+    
+    def gettau(self) -> np.ndarray:
+        """
+        Retrieves joint torques from the robot data wrapper.
+        
+        Returns:
+            np.ndarray: Array containing joint torques.
+        """
+        return self.robot_data.gettau()
+
     def getMassMatrix(self) -> np.ndarray:
         """
         Retrieves the mass matrix from the robot data wrapper.
@@ -150,7 +177,11 @@ class FR3RobotData(RobotDataInterface):
         Returns:
             np.ndarray: Array containing the jacobian.
         """
-        return self.robot_data.getJacobian(link_name)
+        if link_name is None:
+            J = self.robot_data.getJacobian()
+        else:
+            J = self.robot_data.getJacobian(link_name)
+        return np.asarray(J)
     
     def getTaskMassMatrix(self, link_name:str=None) -> np.ndarray:
         """

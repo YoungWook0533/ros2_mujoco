@@ -7,10 +7,12 @@
 
 #include "robot_data.h"
 #include "controller.h"
+#include "math_type_define.h"
 
 namespace bp = boost::python;
 using namespace Eigen;
 using namespace FR3Controller;
+using namespace DyrosMath;
 
 // Converter for std::vector<std::string>
 struct VectorString_to_python
@@ -68,10 +70,19 @@ BOOST_PYTHON_MODULE(fr3_controller_wrapper_cpp)
     bp::to_python_converter<std::vector<std::string>, VectorString_to_python>();
     VectorString_from_python();
 
+    // Bind utility functions
+    bp::def("cubic", cubic);
+    bp::def("rotationCubic", static_cast<const Eigen::Matrix3d(*)(double,double,double,const Eigen::Matrix3d&,const Eigen::Matrix3d&)>(&rotationCubic));
+    bp::def("rot2Euler", rot2Euler);
+    bp::def("Euler2rot", Euler2rot);
+
     // Bind RobotData class
     bp::class_<RobotData, boost::noncopyable>("RobotData", bp::init<std::string>())
         .def("updateState", &RobotData::updateState)
         .def("getJointNames", &RobotData::getJointNames)
+        .def("getq", &RobotData::getq)
+        .def("getqdot", &RobotData::getqdot)
+        .def("gettau", &RobotData::gettau)
         .def("computePose", &RobotData::computePose)
         .def("getPose", &RobotData::getPose)
         .def("computeJacobian", &RobotData::computeJacobian)
@@ -99,7 +110,10 @@ BOOST_PYTHON_MODULE(fr3_controller_wrapper_cpp)
         ;
 
     // Bind Controller class
-    bp::class_<Controller, boost::noncopyable>("Controller", bp::init<double>())
-        .def("tmpControl", &Controller::tmpControl)
+    bp::class_<Controller, boost::noncopyable>("Controller", bp::init<double, RobotData*>())
+        // .def("tmpControl", &Controller::tmpControl)
+        .def("PDJointControl", &Controller::PDJointControl)
+        .def("PDTaskControl", &Controller::PDTaskControl)
+        .def("KeyboardCtrl", &Controller::KeyboardCtrl)
         ;  
 }

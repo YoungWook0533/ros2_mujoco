@@ -27,6 +27,9 @@ namespace FR3Controller
             bool updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& tau);
 
             std::vector<std::string> getJointNames() { return joint_names_; }
+            VectorXd getq();
+            VectorXd getqdot();
+            VectorXd gettau();
 
             Matrix4d computePose(const VectorXd& q, const std::string& link_name=ee_name_); 
             MatrixXd computeJacobian(const VectorXd& q, const std::string& link_name=ee_name_);
