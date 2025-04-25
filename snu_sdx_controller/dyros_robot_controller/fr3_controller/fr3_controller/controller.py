@@ -66,7 +66,6 @@ class FR3Controller(ControllerInterface):
         self.robot_data = RobotDatacpp(urdf_path, yaml_path)
         self.controller = Controllercpp(0.001, self.robot_data)
         self.ee_name = "fr3_link8"
-        self.cmd_vel = np.zeros(6)
             
     def starting(self) -> None:
         """
@@ -89,9 +88,9 @@ class FR3Controller(ControllerInterface):
         self.rot_desired = self.x_init[3:]
         self.torque_desired = self.tau
 
-        self.target_x = self.x_init
-        self.target_xdot = np.zeros(6)
-        self.duration = 2.0
+        # self.target_x = self.x_init
+        # self.target_xdot = np.zeros(6)
+        # self.duration = 2.0
         
     def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray, current_time: float) -> None:
         """
@@ -190,20 +189,21 @@ class FR3Controller(ControllerInterface):
         self.node.get_logger().info(f"[FR3Controller] Mode changed: {mode}")
         self.mode = mode
 
-        # Subscribes to keyboard topics on 'teleop' mode
-        if self.mode == 'teleop':
-            if self.keyboard_subscription is None:
-                self.keyboard_subscription = self.node.create_subscription(Twist, '/keyboard_interface', self.keyboard_callback, 10)
-        if self.mode == 'cartesian':
-            if self.ee_trajectory_sub is None:
-                self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.eeCallback, 10)
-        else:
-            if self.keyboard_subscription is not None:
-                self.node.destroy_subscription(self.keyboard_subscription)
-                self.keyboard_subscription = None
-            if self.ee_trajectory_sub is not None:
-                self.node.destroy_subscription(self.ee_trajectory_sub)
-                self.ee_trajectory_sub = None
+        if self.keyboard_subscription:
+            self.node.destroy_subscription(self.keyboard_subscription)
+            self.keyboard_subscription = None
+        if self.ee_trajectory_sub:
+            self.node.destroy_subscription(self.ee_trajectory_sub)
+            self.ee_trajectory_sub = None
+
+        if mode == 'teleop':
+            self.cmd_vel = np.zeros(6)
+            self.keyboard_subscription = self.node.create_subscription(Twist, '/keyboard_interface', self.keyboard_callback, 10)
+        elif mode == 'cartesian':
+            self.target_x = self.x.copy()
+            self.target_xdot = np.zeros(6)
+            self.duration = 2.0
+            self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.eeCallback, 10)
         
     def keyboard_callback(self, msg: Twist):
         self.cmd_vel = np.array([
@@ -217,12 +217,8 @@ class FR3Controller(ControllerInterface):
         self.target_xdot = np.array(point.velocities)
         self.duration     = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
 
-        # *** reset interpolation ***
+        # reset interpolation
         self.is_mode_changed     = True
-
-        # self.x_init              = self.x
-        # self.control_start_time = self.current_time
-
 
     def asyncCalculationProc(self):
         """
@@ -230,7 +226,8 @@ class FR3Controller(ControllerInterface):
         """
         if self.is_mode_changed:
             self.q_init = self.q
-            self.x_init = self.x
+            self.x_init_mat = self.robot_data.getPose(self.ee_name)
+            self.x_init = tfmatrix_to_array(self.x_init_mat)
             self.control_start_time = self.current_time
             self.init_keyboard = True
             self.is_mode_changed = False
@@ -287,6 +284,7 @@ class FR3Controller(ControllerInterface):
             self.x_desired = np.hstack((self.pos_desired, rot2Euler(self.rot_desired)))
 
             self.torque_desired = self.PDTaskControl(self.x_desired, np.zeros(6))
+            
 
         elif self.mode == 'teleop':
             self.torque_desired = self.KeyboardCtrl(self.init_keyboard, self.cmd_vel)
