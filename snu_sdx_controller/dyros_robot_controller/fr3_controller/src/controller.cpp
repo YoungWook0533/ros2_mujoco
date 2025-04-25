@@ -531,7 +531,7 @@ namespace FR3Controller
             MatrixXd N_s = MatrixXd::Identity(7, 7) - Jbar_s * Js;
 
             VectorXd tau_revised = reviseTorque(tau_desired, robot_data_->getq(), robot_data_->getqdot());
-            tau_desired = tau_revised + N_s * tau_desired;
+            tau_desired = tau_revised + 2.0 * N_s * tau_desired;
         }
         else {
             tau_desired = tau_desired;

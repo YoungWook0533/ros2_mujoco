@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -40,10 +40,19 @@ def generate_launch_description():
             'robot_data_class': robot_data_class
         }]
     )
+    # run gui
+    gui = ExecuteProcess(
+      cmd=[
+        'ros2','run','rqt_gui','rqt_gui',
+        '--standalone','rqt_dyros_gui','--force-discover'
+      ],
+      output='screen'
+    )
 
     return LaunchDescription([
         robot_name_arg,
         controller_class_arg,
         robot_data_class_arg,
-        sim_node
+        sim_node,
+        gui
     ])

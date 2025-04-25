@@ -203,7 +203,7 @@ class FR3Controller(ControllerInterface):
             self.target_x = self.x.copy()
             self.target_xdot = np.zeros(6)
             self.duration = 2.0
-            self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.eeCallback, 10)
+            self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.ee_callback, 10)
         
     def keyboard_callback(self, msg: Twist):
         self.cmd_vel = np.array([
@@ -211,7 +211,7 @@ class FR3Controller(ControllerInterface):
             msg.angular.x, msg.angular.y, msg.angular.z
         ])
 
-    def eeCallback(self, msg: JointTrajectory):
+    def ee_callback(self, msg: JointTrajectory):
         point = msg.points[0]
         self.target_x     = np.array(point.positions)
         self.target_xdot = np.array(point.velocities)
@@ -276,7 +276,7 @@ class FR3Controller(ControllerInterface):
             self.rot_desired = rotationCubic(
                 self.current_time,
                 self.control_start_time,
-                self.control_start_time + 5.0,
+                self.control_start_time + self.duration,
                 self.x_init_mat[:3, :3],
                 Euler2rot(self.target_x[3:])
             )
@@ -289,6 +289,8 @@ class FR3Controller(ControllerInterface):
         elif self.mode == 'teleop':
             self.torque_desired = self.KeyboardCtrl(self.init_keyboard, self.cmd_vel)
             self.init_keyboard = False
+
+# *** Python functions ***
 
     # def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray, kp:float, kd:float) -> np.ndarray:
     #     """
@@ -307,24 +309,6 @@ class FR3Controller(ControllerInterface):
     #     qdot_error = qdot_desired - self.qdot
     #     tau = self.robot_data.getMassMatrix() @ (kp * q_error + kd * qdot_error) + self.robot_data.getNonlinearEffects()
     #     return tau
-
-    def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray) -> np.ndarray:
-        """
-        PD control law for joint position and velocity tracking.
-        
-        Parameters:
-            q_desired (np.ndarray): Desired joint positions.
-            qdot_desired (np.ndarray): Desired joint velocities.
-            kp (float): Proportional gain for position control.
-            kd (float): Derivative gain for velocity control.
-            
-        Returns:
-            np.ndarray: Torque commands computed by the PD controller.
-        """
-        try:
-            return self.controller.PDJointControl(q_desired, qdot_desired)
-        except Exception as e:
-            print(f"Error in torque calculation: {e}")
     
     # def PDTaskControl(self, x_desired:np.ndarray, xdot_desired:np.ndarray, kp:float, kd:float) -> np.ndarray:
     #     """
@@ -348,6 +332,24 @@ class FR3Controller(ControllerInterface):
 
     #     tau = self.J.T @ (self.robot_data.getTaskMassMatrix(self.ee_name) @ (kp * x_error + kd * xdot_error) + self.robot_data.getTaskNonlinearEffects(self.ee_name)) + tau_task
     #     return tau
+
+    def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray) -> np.ndarray:
+        """
+        PD control law for joint position and velocity tracking.
+        
+        Parameters:
+            q_desired (np.ndarray): Desired joint positions.
+            qdot_desired (np.ndarray): Desired joint velocities.
+            kp (float): Proportional gain for position control.
+            kd (float): Derivative gain for velocity control.
+            
+        Returns:
+            np.ndarray: Torque commands computed by the PD controller.
+        """
+        try:
+            return self.controller.PDJointControl(q_desired, qdot_desired)
+        except Exception as e:
+            print(f"Error in torque calculation: {e}")
     
     def PDTaskControl(self, x_desired:np.ndarray, xdot_desired:np.ndarray) -> np.ndarray:
         """
