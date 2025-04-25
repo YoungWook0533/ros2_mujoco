@@ -15,8 +15,9 @@ namespace FR3Controller
         ~Controller();
 
         // VectorXd tmpControl();
-        VectorXd PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot, const double kp, const double kd);
-        VectorXd PDTaskControl(const VectorXd& desired_x, const VectorXd& desired_xdot, const double kp, const double kd);
+        VectorXd PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot);
+        VectorXd PDTaskControl(const VectorXd& desired_x, const VectorXd& desired_xdot);
+        VectorXd QPIK(const VectorXd& desired_x, const VectorXd& desired_xdot);
 
         double getBlendingCoeff(double val, double limit1, double limit2);
         void saturatePosition(const VectorXd &q);
@@ -34,6 +35,12 @@ namespace FR3Controller
     private :
         double dt_;
         RobotData* robot_data_;
+
+        MatrixXd M_T_;
+        MatrixXd K_T_;
+        MatrixXd B_T_;
+        VectorXd Kp_;
+        VectorXd Kd_;
 
         enum LimitState { SAFE = 0, MIN_SOFT = 1, MAX_SOFT = 2, MIN_HARD = 3, MAX_HARD = 4 };
         enum VelLimitState { V_SAFE = 0, MIN_SOFT_VEL = 1, MAX_SOFT_VEL = 2, MIN_HARD_VEL = 3, MAX_HARD_VEL = 4 };
@@ -66,7 +73,7 @@ namespace FR3Controller
         const Vector3d monitoring_point_ee_frame = Vector3d(0.0, 0.0, -0.15);
         const double safety_plane_z_coordinate = 0.28;
         const double safety_cylinder_radius = 0.28;
-        const double safety_cylinder_height = 0.53;
+        const double safety_cylinder_height = 0.6;
         bool safety_mode_flag = false;
         VectorXd limited_joints;
         VectorXd x_dot_lfp_; 

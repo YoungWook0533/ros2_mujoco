@@ -2,6 +2,7 @@
 #include "robot_data.h"
 #include "math_type_define.h"
 #include <cmath>
+#include <qpOASES.hpp>
 
 namespace FR3Controller
 { 
@@ -10,6 +11,21 @@ namespace FR3Controller
     {
         dt_ = dt;
         robot_data_ = rd;
+
+        M_T_ = robot_data_->getMT();
+        K_T_ = robot_data_->getKT();
+        B_T_ = robot_data_->getBT();
+        Kp_ = robot_data_->getKp();
+        Kd_ = robot_data_->getKd();
+
+        std::cout << "[RobotData] Loaded task‐space gains:\n";
+        std::cout << "  M_T: "   << "\n"<< M_T_<< "\n";
+        std::cout << "  K_T: "   << "\n"<< K_T_<< "\n";
+        std::cout << "  B_T: "   << "\n"<< B_T_<< "\n\n";
+
+        std::cout << "[RobotData] Loaded joint‐space gains:\n";
+        std::cout << "  Kp: "    << Kp_.transpose()<< "\n";
+        std::cout << "  Kd: "    << Kd_.transpose()<< "\n";
 
         q_min_.resize(7);
         q_min_ <<  -2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973;
@@ -91,9 +107,9 @@ namespace FR3Controller
         limited_joints.resize(7); 
         limited_joints.setZero();
 
-        x_dot_lfp_ = Eigen::VectorXd::Zero(6);
+        x_dot_lfp_ = VectorXd::Zero(6);
         theta_z_ = 0.0;
-        x_d_ = Eigen::MatrixXd::Zero(4,4);
+        x_d_ = MatrixXd::Zero(4,4);
     }
 
     Controller::~Controller()
@@ -105,14 +121,14 @@ namespace FR3Controller
     //     return VectorXd::Zero(7);
     // }
 
-    VectorXd Controller::PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot, const double kp, const double kd)
+    VectorXd Controller::PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot)
     {
-        VectorXd qddot_target = kp * (desired_q - robot_data_->getq()) + kd * (desired_qdot - robot_data_->getqdot());
+        VectorXd qddot_target = Kp_.cwiseProduct(desired_q - robot_data_->getq()) + Kd_.cwiseProduct(desired_qdot - robot_data_->getqdot());
         VectorXd tau_desired = robot_data_->getMassMatrix() * qddot_target + robot_data_->getNonlinearEffects();
         return tau_desired;
     }
 
-    VectorXd Controller::PDTaskControl(const VectorXd& desired_x, const VectorXd& desired_xdot, const double kp, const double kd)
+    VectorXd Controller::PDTaskControl(const VectorXd& desired_x, const VectorXd& desired_xdot)
     {
         // Compute pose error
         VectorXd x_error(6);
@@ -132,7 +148,7 @@ namespace FR3Controller
         VectorXd xdot_error(6);
         xdot_error = robot_data_->getJacobian() * robot_data_->getqdot() - desired_xdot;
             
-        VectorXd tau_task = robot_data_->getJacobian().transpose() * (robot_data_->getTaskMassMatrix() * (-kp * x_error - kd * xdot_error) + robot_data_->getTaskNonlinearEffects());
+        VectorXd tau_task = robot_data_->getJacobian().transpose() * (robot_data_->getTaskMassMatrix() * (-K_T_ * x_error - B_T_ * xdot_error) + robot_data_->getTaskNonlinearEffects());
 
         double lambda = 0.3;
         MatrixXd J_transpose_pinv = robot_data_->getJacobian() * (robot_data_->getJacobian().transpose() * robot_data_->getJacobian() + lambda * lambda * MatrixXd::Identity(7, 7)).inverse();
@@ -146,6 +162,78 @@ namespace FR3Controller
 
         VectorXd tau_desired = tau_task + tau_null + robot_data_->getNonlinearEffects();
         return tau_desired;
+    }
+
+    VectorXd Controller::QPIK(const VectorXd& desired_x, const VectorXd& desired_xdot)
+    {
+
+            // --- Compute pose error ---
+            Eigen::VectorXd x_error(6);
+            Eigen::Quaterniond desired_orientation = Eigen::AngleAxisd(desired_x[5], Eigen::Vector3d::UnitZ()) *
+                                                    Eigen::AngleAxisd(desired_x[4], Eigen::Vector3d::UnitY()) *
+                                                    Eigen::AngleAxisd(desired_x[3], Eigen::Vector3d::UnitX());
+            Eigen::Quaterniond current_orientation(robot_data_->getPose().block<3, 3>(0, 0));
+            Eigen::Quaterniond orientation_error = desired_orientation * current_orientation.conjugate();
+            Eigen::AngleAxisd angle_axis_error(orientation_error);
+            x_error.head<3>() = desired_x.head<3>() - robot_data_->getPose().block<3, 1>(0, 3);
+            x_error.tail<3>() = angle_axis_error.axis() * angle_axis_error.angle();
+
+            // --- Compute velocity error ---
+            Eigen::VectorXd xdot_error(6);
+            xdot_error.head<3>() = desired_xdot.head<3>() - robot_data_->getqdot().head<3>();
+            xdot_error.tail<3>() = desired_xdot.tail<3>() - robot_data_->getqdot().tail<3>();
+
+            // --- Define QP problem ---
+            MatrixXd H = 2 * (robot_data_->getJacobian().transpose() * robot_data_->getJacobian() + 0.1 * MatrixXd::Identity(7, 7)); // Regularized Hessian
+            VectorXd g = -2 * robot_data_->getJacobian().transpose() * x_error; // Gradient
+
+            // --- Joint limits ---
+            VectorXd lb = q_min_ - robot_data_->getq();
+            VectorXd ub = q_max_ - robot_data_->getq();
+
+            // --- Define QP Solver ---
+            qpOASES::QProblem qp_solver(7, 0); // No equality constraints
+            qpOASES::Options options;
+            options.setToMPC();
+            options.printLevel = qpOASES::PL_NONE; // Suppress output
+            qp_solver.setOptions(options);
+
+            // Convert Eigen matrices to raw data for qpOASES
+            double H_qp[7 * 7];
+            double g_qp[7];
+            double lb_qp[7], ub_qp[7];
+
+            for (int i = 0; i < 7; ++i) {
+                g_qp[i] = g(i);
+                lb_qp[i] = lb(i);
+                ub_qp[i] = ub(i);
+                for (int j = 0; j < 7; ++j) {
+                    H_qp[i * 7 + j] = H(i, j);
+                }
+            }
+
+            // --- Solve QP ---
+            int nWSR = 15;
+            qp_solver.init(H_qp, g_qp, nullptr, lb_qp, ub_qp, nullptr, nullptr, nWSR);
+
+            VectorXd q_opt = robot_data_->getq();
+            qpOASES::real_t q_solution[7];
+
+            if (qp_solver.getPrimalSolution(q_solution) == qpOASES::SUCCESSFUL_RETURN) {
+                for (int i = 0; i < 7; ++i) {
+                    q_opt[i] = q_solution[i] + robot_data_->getq()[i]; // Apply the computed delta
+                }
+            } else {
+                std::cerr << "QP solver failed, returning initial joint positions." << std::endl;
+                return robot_data_->getq(); // Return the current joint positions if QP fails
+            }
+            
+            VectorXd qdot_desired;
+            qdot_desired = VectorXd::Zero(7);
+            VectorXd tau_desired = PDJointControl(q_opt, qdot_desired);
+
+            // --- Return computed joint torques ---
+            return tau_desired;
     }
 
     // ----- <User Custom Controller Func(C++)> -----
@@ -316,14 +404,33 @@ namespace FR3Controller
         {
             is_violated = true;
             std::cout << "WARNING : End effector too low, engaging safety mode" << std::endl;
-            std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;     
+            std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;   
+            x_d_.block<3,1>(0,3)(2) = safety_plane_z_coordinate - 0.15;    
         }
         // cylinder
-        if(z_ee < safety_cylinder_height && radius_square < safety_cylinder_radius*safety_cylinder_radius)
+        if (z_ee < safety_cylinder_height && radius_square < pow(safety_cylinder_radius, 2))
         {
             is_violated = true;
             std::cout << "WARNING : End effector too close to center of workspace, engaging safety mode" << std::endl;
-            std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;    
+            std::cout << "Monitoring point: " << monitoring_point.transpose() << std::endl;
+            
+            Vector3d des_pos = x_d_.block<3,1>(0,3);
+            Vector2d xy_des(des_pos(0), des_pos(1));
+            double current_radius = xy_des.norm();
+            if (current_radius < safety_cylinder_radius)
+            {
+                if (current_radius < safety_cylinder_radius - 0.01)
+                {
+                    x_d_.block<3,1>(0,3)(2) = safety_cylinder_height - 0.15;
+                }
+                else
+                {
+                    xy_des = xy_des.normalized() * safety_cylinder_radius;
+                    des_pos(0) = xy_des(0);
+                    des_pos(1) = xy_des(1);
+                    x_d_.block<3,1>(0,3) = des_pos;
+                }   
+            }
         }
         
         return is_violated;
@@ -335,25 +442,30 @@ namespace FR3Controller
                                                       const Ref<const VectorXd> &dq,
                                                       const Ref<const VectorXd> &tau)
     {
-    bool pos_safty, vel_safty;
-    VectorXd safety_torque;
+        bool pos_safty, vel_safty;
+        VectorXd torque;
+        VectorXd safety_torque;
 
-    safety_torque = tau;
+        torque = tau;
 
-    pos_safty = positionViolation(q);
-    vel_safty = velocityViolation(dq);
+        pos_safty = positionViolation(q);
+        vel_safty = velocityViolation(dq);
 
-    if(pos_safty || vel_safty) safety_mode_flag = true;
+        if(pos_safty || vel_safty) safety_mode_flag = true;
 
-    if (safety_enabled)
-        safety_mode_flag = cartesianViolation(T);
-
-        if(safety_mode_flag)
+        if (safety_enabled)
         {
-            x_d_ = robot_data_->getPose();
-        }
-        return safety_torque;
+            safety_mode_flag = cartesianViolation(T);
 
+            if(safety_mode_flag)
+            {
+                safety_torque = tau;
+                // x_d_ = robot_data_->getPose();
+                return safety_torque;
+            }
+
+        }
+        return torque;
     }
 
 
@@ -390,8 +502,8 @@ namespace FR3Controller
         // std::cout<<"xdot : "<< xdot_.transpose() <<std::endl;
 
         VectorXd xdot_d = VectorXd::Zero(6);
-
-        VectorXd tau_desired = PDTaskControl(desired_x, xdot_d, 1000, 100);
+        // VectorXd tau_desired = PDTaskControl(desired_x, xdot_d);
+        VectorXd tau_desired = QPIK(desired_x, xdot_d);
 
         VectorXi limited_joints(7);
         limited_joints.setZero();
@@ -419,7 +531,7 @@ namespace FR3Controller
             MatrixXd N_s = MatrixXd::Identity(7, 7) - Jbar_s * Js;
 
             VectorXd tau_revised = reviseTorque(tau_desired, robot_data_->getq(), robot_data_->getqdot());
-            tau_desired = tau_revised + N_s.transpose() * tau_desired;
+            tau_desired = tau_revised + N_s * tau_desired;
         }
         else {
             tau_desired = tau_desired;

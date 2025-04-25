@@ -21,6 +21,8 @@ add_library(fr3_controller SHARED
 target_link_libraries(fr3_controller
   Eigen3::Eigen
   rclcpp::rclcpp
+  qpOASES
+  yaml-cpp
   # 등 필요한 라이브러리
 )
 
@@ -74,6 +76,7 @@ install(TARGETS fr3_controller_wrapper_cpp
 
 
 install(DIRECTORY robot/ DESTINATION share/${PROJECT_NAME}/fr3_controller/robot)
+install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/fr3_controller/config)  # yaml path
 #-----------------------------------------
 # NOTE: 여기서는 ament_package()를 호출하지 않음.
 #       상위(루트) CMakeLists에서만 ament_package() 호출.

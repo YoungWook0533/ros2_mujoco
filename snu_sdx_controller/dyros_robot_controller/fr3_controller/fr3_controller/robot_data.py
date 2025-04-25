@@ -48,8 +48,14 @@ class FR3RobotData(RobotDataInterface):
             'robot',
             'fr3.urdf'
         )
+        yaml_path = os.path.join(
+            get_package_share_directory('dyros_robot_controller'),
+            'fr3_controller',
+            'config',
+            'gains.yaml'
+        )
         # Create the C++ robot data instance using the URDF file.
-        self.robot_data = RobotDatacpp(urdf_path)
+        self.robot_data = RobotDatacpp(urdf_path, yaml_path)
         
         # Retrieve the robot joint names from the C++ robot data wrapper.
         self.rb_joint_names = self.robot_data.getJointNames()

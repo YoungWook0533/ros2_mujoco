@@ -15,7 +15,9 @@ find_package(rclcpp REQUIRED)
 find_package(Boost REQUIRED COMPONENTS python)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(eigenpy REQUIRED)
+find_package(yaml-cpp REQUIRED)
 find_package(pinocchio REQUIRED)
+find_package(qpOASES REQUIRED)
 
 include_directories(
   ${EIGEN3_INCLUDE_DIRS}

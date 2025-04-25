@@ -9,6 +9,7 @@ from fr3_controller_wrapper_cpp import Controller as Controllercpp
 from fr3_controller_wrapper_cpp import RobotData as RobotDatacpp
 from fr3_controller_wrapper_cpp import cubic, rotationCubic, Euler2rot, rot2Euler
 from std_msgs.msg import Int32
+from trajectory_msgs.msg import JointTrajectory
 from geometry_msgs.msg import Twist
 
 class FR3Controller(ControllerInterface):
@@ -50,11 +51,19 @@ class FR3Controller(ControllerInterface):
             'robot',
             'fr3.urdf'
         )
+
+        yaml_path = os.path.join(
+            get_package_share_directory('dyros_robot_controller'),
+            'fr3_controller',
+            'config',
+            'gains.yaml'
+        )
         
         self.key_subscriber = self.node.create_subscription(Int32, '/key_input', self.keyCallback, 10)
         self.keyboard_subscription = None
+        self.ee_trajectory_sub = None
         # self.robot_data = FR3RobotData(self.node, mj_joint_names)
-        self.robot_data = RobotDatacpp(urdf_path)
+        self.robot_data = RobotDatacpp(urdf_path, yaml_path)
         self.controller = Controllercpp(0.001, self.robot_data)
         self.ee_name = "fr3_link8"
         self.cmd_vel = np.zeros(6)
@@ -79,6 +88,10 @@ class FR3Controller(ControllerInterface):
         self.pos_desired = self.x_init[:3]
         self.rot_desired = self.x_init[3:]
         self.torque_desired = self.tau
+
+        self.target_x = self.x_init
+        self.target_xdot = np.zeros(6)
+        self.duration = 2.0
         
     def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray, current_time: float) -> None:
         """
@@ -181,16 +194,35 @@ class FR3Controller(ControllerInterface):
         if self.mode == 'teleop':
             if self.keyboard_subscription is None:
                 self.keyboard_subscription = self.node.create_subscription(Twist, '/keyboard_interface', self.keyboard_callback, 10)
+        if self.mode == 'cartesian':
+            if self.ee_trajectory_sub is None:
+                self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.eeCallback, 10)
         else:
             if self.keyboard_subscription is not None:
                 self.node.destroy_subscription(self.keyboard_subscription)
                 self.keyboard_subscription = None
+            if self.ee_trajectory_sub is not None:
+                self.node.destroy_subscription(self.ee_trajectory_sub)
+                self.ee_trajectory_sub = None
         
     def keyboard_callback(self, msg: Twist):
         self.cmd_vel = np.array([
             msg.linear.x, msg.linear.y, msg.linear.z,
             msg.angular.x, msg.angular.y, msg.angular.z
         ])
+
+    def eeCallback(self, msg: JointTrajectory):
+        point = msg.points[0]
+        self.target_x     = np.array(point.positions)
+        self.target_xdot = np.array(point.velocities)
+        self.duration     = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+
+        # *** reset interpolation ***
+        self.is_mode_changed     = True
+
+        # self.x_init              = self.x
+        # self.control_start_time = self.current_time
+
 
     def asyncCalculationProc(self):
         """
@@ -216,7 +248,7 @@ class FR3Controller(ControllerInterface):
                     0.0,  # initial velocity (assumed zero)
                     0.0   # final velocity (assumed zero)
                 )
-            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7), 1000, 100)
+            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7))
         elif self.mode == 'home':
             target_q = np.array([0, 0, 0, -np.pi/2, 0, np.pi/2, np.pi/4])
             for i in range(7):
@@ -229,17 +261,17 @@ class FR3Controller(ControllerInterface):
                     0.0,  # initial velocity (assumed zero)
                     0.0   # final velocity (assumed zero)
                 )
-            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7), 1000, 100)
+            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7))
 
         elif self.mode == 'cartesian':
-            target_x = np.array([0.3, 0.0, 0.5, -3.14, 0.0, 0.0])
+            # target_x = np.array([0.3, 0.0, 0.5, -3.14, 0.0, 0.0])
             for i in range(3):
                 self.pos_desired[i] = cubic(
                     self.current_time,              # Current time
                     self.control_start_time,        # Start time of control
-                    self.control_start_time + 5.0,  # End time of interpolation (2 seconds later)
+                    self.control_start_time + self.duration,  # End time of interpolation
                     self.x_init[i],                # Initial EE pose
-                    target_x[i],                   # Target EE pose
+                    self.target_x[i],                   # Target EE pose
                     0.0,
                     0.0                    
                 )
@@ -249,12 +281,12 @@ class FR3Controller(ControllerInterface):
                 self.control_start_time,
                 self.control_start_time + 5.0,
                 self.x_init_mat[:3, :3],
-                Euler2rot(target_x[3:])
+                Euler2rot(self.target_x[3:])
             )
 
             self.x_desired = np.hstack((self.pos_desired, rot2Euler(self.rot_desired)))
 
-            self.torque_desired = self.PDTaskControl(self.x_desired, np.zeros(6), 1000, 100)
+            self.torque_desired = self.PDTaskControl(self.x_desired, np.zeros(6))
 
         elif self.mode == 'teleop':
             self.torque_desired = self.KeyboardCtrl(self.init_keyboard, self.cmd_vel)
@@ -278,7 +310,7 @@ class FR3Controller(ControllerInterface):
     #     tau = self.robot_data.getMassMatrix() @ (kp * q_error + kd * qdot_error) + self.robot_data.getNonlinearEffects()
     #     return tau
 
-    def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray, kp:float, kd:float) -> np.ndarray:
+    def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray) -> np.ndarray:
         """
         PD control law for joint position and velocity tracking.
         
@@ -292,7 +324,7 @@ class FR3Controller(ControllerInterface):
             np.ndarray: Torque commands computed by the PD controller.
         """
         try:
-            return self.controller.PDJointControl(q_desired, qdot_desired, kp, kd)
+            return self.controller.PDJointControl(q_desired, qdot_desired)
         except Exception as e:
             print(f"Error in torque calculation: {e}")
     
@@ -319,7 +351,7 @@ class FR3Controller(ControllerInterface):
     #     tau = self.J.T @ (self.robot_data.getTaskMassMatrix(self.ee_name) @ (kp * x_error + kd * xdot_error) + self.robot_data.getTaskNonlinearEffects(self.ee_name)) + tau_task
     #     return tau
     
-    def PDTaskControl(self, x_desired:np.ndarray, xdot_desired:np.ndarray, kp:float, kd:float) -> np.ndarray:
+    def PDTaskControl(self, x_desired:np.ndarray, xdot_desired:np.ndarray) -> np.ndarray:
         """
         PD control law for end-effector position and velocity tracking.
         
@@ -333,7 +365,25 @@ class FR3Controller(ControllerInterface):
             np.ndarray: Torque commands computed by the PD controller.
         """
         try:
-            return self.controller.PDTaskControl(x_desired, xdot_desired, kp, kd)
+            return self.controller.PDTaskControl(x_desired, xdot_desired)
+        except Exception as e:
+            print(f"Error in torque calculation: {e}")
+
+    def QPIK(self, x_desired:np.ndarray, xdot_desired:np.ndarray) -> np.ndarray:
+        """
+        PD control law for end-effector position and velocity tracking.
+        
+        Parameters:
+            x_desired (np.ndarray): Desired end-effector positions.
+            xdot_desired (np.ndarray): Desired end-effector velocities.
+            kp (float): Proportional gain for position control.
+            kd (float): Derivative gain for velocity control.
+            
+        Returns:
+            np.ndarray: Torque commands computed by the PD controller.
+        """
+        try:
+            return self.controller.QPIK(x_desired, xdot_desired)
         except Exception as e:
             print(f"Error in torque calculation: {e}")
 
@@ -351,3 +401,5 @@ class FR3Controller(ControllerInterface):
             return self.controller.KeyboardCtrl(init, cmd_vel)
         except Exception as e:
             print(f"Error in torque calculation: {e}")
+
+# ros2 topic pub /key_input std_msgs/msg/Int32 "data: 3" -1

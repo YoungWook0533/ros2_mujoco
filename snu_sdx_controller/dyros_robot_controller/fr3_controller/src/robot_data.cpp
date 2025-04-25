@@ -1,9 +1,10 @@
 #include "robot_data.h"
+#include <yaml-cpp/yaml.h>
 
 
 namespace FR3Controller
 {
-    RobotData::RobotData(const std::string& urdf_path)
+    RobotData::RobotData(const std::string& urdf_path, const std::string& yaml_path)
     {
         std::ifstream file(urdf_path);
         if (!file.good()) std::cout << "URDF file does not exist! : " << urdf_path << std::endl;
@@ -37,11 +38,66 @@ namespace FR3Controller
         M_ee_inv_ = MatrixXd::Zero(6, 6);
         g_ee_ = VectorXd::Zero(6);       
         c_ee_ = VectorXd::Zero(6);       
-        NLE_ee_ = VectorXd::Zero(6);  
+        NLE_ee_ = VectorXd::Zero(6); 
+        
+        // Gains
+        M_T_ = MatrixXd::Zero(6, 6);
+        K_T_ = MatrixXd::Zero(6, 6);
+        B_T_ = MatrixXd::Zero(6, 6);
+        Kp_.resize(model_.nq);
+        Kd_.resize(model_.nq);
+
+        loadGainsFromYaml(yaml_path);
     }
 
     RobotData::~RobotData()
     {
+    }
+
+    void RobotData::loadGainsFromYaml(const std::string& yaml_file) {
+
+        YAML::Node config = YAML::LoadFile(yaml_file);
+
+        // Load task space gains
+        const auto& task_space = config["task_space_gains"];
+        VectorXd M_T_diag = VectorXd::Map(task_space["M_T"].as<std::vector<double>>().data(), 6);
+        VectorXd K_T_diag = VectorXd::Map(task_space["K_T"].as<std::vector<double>>().data(), 6);
+        VectorXd B_T_diag = VectorXd::Map(task_space["B_T"].as<std::vector<double>>().data(), 6);
+
+        M_T_ = M_T_diag.asDiagonal();
+        K_T_ = K_T_diag.asDiagonal();
+        B_T_ = B_T_diag.asDiagonal();
+
+        // Load joint space gains
+        const auto& joint_space = config["joint_space_gains"];
+        Kp_ = VectorXd::Map(joint_space["Kp"].as<std::vector<double>>().data(), model_.nq);
+        Kd_ = VectorXd::Map(joint_space["Kd"].as<std::vector<double>>().data(), model_.nq);
+
+    }
+
+    MatrixXd RobotData::getMT()
+    {
+        return M_T_;
+    }
+
+    MatrixXd RobotData::getKT()
+    {
+        return K_T_;
+    }
+
+    MatrixXd RobotData::getBT()
+    {
+        return B_T_;
+    }
+
+    VectorXd RobotData::getKp()
+    {
+        return Kp_;
+    }
+    
+    VectorXd RobotData::getKd()
+    {
+        return Kd_;
     }
 
     bool RobotData::updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& tau)

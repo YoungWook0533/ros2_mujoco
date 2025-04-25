@@ -22,8 +22,15 @@ namespace FR3Controller
     class RobotData
     {
         public:
-            RobotData(const std::string& urdf_path);
+            RobotData(const std::string& urdf_path, const std::string& yaml_path);
             ~RobotData();
+            void loadGainsFromYaml(const std::string& yaml_file);
+            MatrixXd getMT();
+            MatrixXd getKT();
+            MatrixXd getBT();
+            VectorXd getKp();
+            VectorXd getKd();
+
             bool updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& tau);
 
             std::vector<std::string> getJointNames() { return joint_names_; }
@@ -92,6 +99,13 @@ namespace FR3Controller
             VectorXd g_ee_;     // gravity forces
             VectorXd c_ee_;     // centrifugal and coriolis forces
             VectorXd NLE_ee_;   // nonlinear effects ( g_ + c_ )
+
+            // Gains
+            MatrixXd M_T_;
+            MatrixXd K_T_;
+            MatrixXd B_T_;
+            VectorXd Kp_;
+            VectorXd Kd_;
     };
 }
 

@@ -77,7 +77,7 @@ BOOST_PYTHON_MODULE(fr3_controller_wrapper_cpp)
     bp::def("Euler2rot", Euler2rot);
 
     // Bind RobotData class
-    bp::class_<RobotData, boost::noncopyable>("RobotData", bp::init<std::string>())
+    bp::class_<RobotData, boost::noncopyable>("RobotData", bp::init<std::string, std::string>())
         .def("updateState", &RobotData::updateState)
         .def("getJointNames", &RobotData::getJointNames)
         .def("getq", &RobotData::getq)
@@ -114,6 +114,7 @@ BOOST_PYTHON_MODULE(fr3_controller_wrapper_cpp)
         // .def("tmpControl", &Controller::tmpControl)
         .def("PDJointControl", &Controller::PDJointControl)
         .def("PDTaskControl", &Controller::PDTaskControl)
+        .def("QPIK", &Controller::QPIK)
         .def("KeyboardCtrl", &Controller::KeyboardCtrl)
         ;  
 }
