@@ -8,7 +8,7 @@ from ament_index_python.packages import get_package_share_directory
 from fr3_controller_wrapper_cpp import Controller as Controllercpp
 from fr3_controller_wrapper_cpp import RobotData as RobotDatacpp
 from fr3_controller_wrapper_cpp import cubic, rotationCubic, Euler2rot, rot2Euler
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Int8MultiArray
 from trajectory_msgs.msg import JointTrajectory
 from geometry_msgs.msg import Twist
 
@@ -62,6 +62,10 @@ class FR3Controller(ControllerInterface):
         self.key_subscriber = self.node.create_subscription(Int32, '/key_input', self.keyCallback, 10)
         self.keyboard_subscription = None
         self.ee_trajectory_sub = None
+
+        self.button_pressed = False
+        self.button_subscriber = None
+
         # self.robot_data = FR3RobotData(self.node, mj_joint_names)
         self.robot_data = RobotDatacpp(urdf_path, yaml_path)
         self.controller = Controllercpp(0.001, self.robot_data)
@@ -195,10 +199,14 @@ class FR3Controller(ControllerInterface):
         if self.ee_trajectory_sub:
             self.node.destroy_subscription(self.ee_trajectory_sub)
             self.ee_trajectory_sub = None
+        if self.button_subscriber:
+            self.node.destroy_subscription(self.button_subscriber)
+            self.button_subscriber = None
 
         if mode == 'teleop':
             self.cmd_vel = np.zeros(6)
-            self.keyboard_subscription = self.node.create_subscription(Twist, '/keyboard_interface', self.keyboard_callback, 10)
+            self.keyboard_subscription = self.node.create_subscription(Twist, '/haptic/twist', self.keyboard_callback, 10)
+            self.button_subscriber = self.node.create_subscription(Int8MultiArray, '/haptic/button_state', self.button_state_callback, 10)
         elif mode == 'cartesian':
             self.target_x = self.x.copy()
             self.target_xdot = np.zeros(6)
@@ -206,10 +214,11 @@ class FR3Controller(ControllerInterface):
             self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.ee_callback, 10)
         
     def keyboard_callback(self, msg: Twist):
-        self.cmd_vel = np.array([
-            msg.linear.x, msg.linear.y, msg.linear.z,
-            msg.angular.x, msg.angular.y, msg.angular.z
-        ])
+        if not self.button_pressed:
+            self.cmd_vel = np.zeros(6)
+    
+        else: 
+            self.cmd_vel = np.array([5 * msg.linear.x, 5 * msg.linear.y, 5 * msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
 
     def ee_callback(self, msg: JointTrajectory):
         point = msg.points[0]
@@ -219,6 +228,9 @@ class FR3Controller(ControllerInterface):
 
         # reset interpolation
         self.is_mode_changed     = True
+
+    def button_state_callback(self, msg: Int8MultiArray):
+        self.button_pressed = bool(msg.data[0] == 1)
 
     def asyncCalculationProc(self):
         """

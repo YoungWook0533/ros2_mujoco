@@ -92,6 +92,8 @@ namespace FR3Controller
         VectorXd soft_max_joint_velocity_limits;
         VectorXd hard_max_joint_velocity_limits;
 
+        double theta_x_;
+        double theta_y_;
         double theta_z_;
         MatrixXd x_d_;
 

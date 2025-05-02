@@ -108,6 +108,8 @@ namespace FR3Controller
         limited_joints.setZero();
 
         x_dot_lfp_ = VectorXd::Zero(6);
+        theta_x_ = 0.0;
+        theta_y_ = 0.0;
         theta_z_ = 0.0;
         x_d_ = MatrixXd::Zero(4,4);
     }
@@ -492,6 +494,10 @@ namespace FR3Controller
 
         theta_z_ += cmd_vel(5) * dt_;
         Matrix3d R_d = DyrosMath::rotateWithZ(theta_z_);
+        theta_y_ += cmd_vel(4) * dt_;
+        R_d = R_d * DyrosMath::rotateWithY(theta_y_);
+        theta_x_ += cmd_vel(3) * dt_;
+        R_d = R_d * DyrosMath::rotateWithX(theta_x_);
         x_d_.block<3,3>(0,0) = R_d * x_init_.block<3,3>(0,0);
 
         VectorXd desired_x(6);
@@ -531,7 +537,7 @@ namespace FR3Controller
             MatrixXd N_s = MatrixXd::Identity(7, 7) - Jbar_s * Js;
 
             VectorXd tau_revised = reviseTorque(tau_desired, robot_data_->getq(), robot_data_->getqdot());
-            tau_desired = tau_revised + 2.0 * N_s * tau_desired;
+            tau_desired = tau_revised + N_s * tau_desired;
         }
         else {
             tau_desired = tau_desired;
