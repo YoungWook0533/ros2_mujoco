@@ -42,7 +42,7 @@ install(TARGETS haptic_ros_driver
 
 install(DIRECTORY lib/
   DESTINATION lib/${PROJECT_NAME}
-  FILES_MATCHING PATTERN "libdhd.so*"
+  FILES_MATCHING PATTERN ".so*"
 )
 
 set_target_properties(haptic_ros_driver PROPERTIES

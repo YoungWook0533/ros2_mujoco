@@ -144,7 +144,7 @@ class MujocoSimNode(Node):
                 # tau: array of applied forces (qfrc_applied, including any external forces)
                 pos = np.copy(self.mj_data.qpos)
                 vel = np.copy(self.mj_data.qvel)
-                tau = np.copy(self.mj_data.qfrc_applied)
+                tau = np.copy(self.mj_data.qfrc_actuator + self.mj_data.qfrc_applied + self.mj_data.qfrc_constraint)
                 
                 # Update the controller with the current state.
                 if self.controller is not None:

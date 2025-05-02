@@ -495,4 +495,21 @@ namespace FR3Controller
 
         return c_task + g_task;
     }
+
+    VectorXd RobotData::getWrench(const std::string& link_name)
+    {
+        pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
+        if (link_index == static_cast<pinocchio::FrameIndex>(-1))  
+        {
+            std::cerr << "Error: Link name " << link_name << " not found in URDF." << std::endl;
+            return VectorXd::Zero(6);
+        }
+
+        MatrixXd J_hand = RobotData::getJacobian(link_name);
+        MatrixXd J_bar = M_inv_ * J_hand.transpose() * M_ee_;
+        VectorXd tau_ext = tau_ - NLE_;
+        VectorXd wrench_ee = J_bar.transpose() * tau_ext;
+
+        return wrench_ee;
+    }
 }

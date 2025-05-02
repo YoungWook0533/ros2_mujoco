@@ -107,6 +107,7 @@ BOOST_PYTHON_MODULE(fr3_controller_wrapper_cpp)
         .def("getTaskGravity", &RobotData::getTaskGravity)
         .def("computeTaskNonlinearEffects", &RobotData::computeTaskNonlinearEffects)
         .def("getTaskNonlinearEffects", &RobotData::getTaskNonlinearEffects)
+        .def("getWrench", &RobotData::getWrench)
         ;
 
     // Bind Controller class

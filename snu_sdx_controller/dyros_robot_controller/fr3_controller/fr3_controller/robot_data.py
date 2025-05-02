@@ -206,3 +206,12 @@ class FR3RobotData(RobotDataInterface):
             np.ndarray: Array containing the task space nonlinear effects.
         """
         return self.robot_data.getTaskNonlinearEffects(link_name)
+    
+    def getWrench(self, link_name:str=None) -> np.ndarray:
+        """
+        Retrieves the task space wrench from the robot data wrapper.
+        
+        Returns:
+            np.ndarray: Array containing the task space wrench.
+        """
+        return self.robot_data.getWrench(link_name)

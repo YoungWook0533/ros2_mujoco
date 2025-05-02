@@ -1,5 +1,6 @@
 #include "haptic_ros_driver/HapticDevice.h"
 #include <chrono>
+#include <algorithm>
 
 using namespace std::chrono_literals;
 
@@ -17,6 +18,7 @@ HapticDevice::HapticDevice(double loop_hz, bool set_force)
   device_enabled_(false),
   force_released_(true),
   force_limit_(10.0, 10.0, 10.0),
+  filtered_force_feedback_ (Eigen::Vector3d::Zero()),
   position_(Eigen::Vector3d::Zero()),
   orientation_(Eigen::Matrix3d::Identity()),
   ori_encoder_(Eigen::Vector3d::Zero()),
@@ -74,6 +76,10 @@ void HapticDevice::RegisterCallback()
   force_sub_ = create_subscription<geometry_msgs::msg::Vector3>(
     "/haptic/force", 1,
     std::bind(&HapticDevice::ForceCallback, this, std::placeholders::_1));
+
+  wrench_sub_ = create_subscription<geometry_msgs::msg::WrenchStamped>(
+    "/wrench", 1,
+    std::bind(&HapticDevice::WrenchCallback, this, std::placeholders::_1));
 }
 
 void HapticDevice::Start()
@@ -127,7 +133,7 @@ void HapticDevice::GetHapticDataRun()
     }
 
     PublishHapticData();
-    ApplyReturnToOriginForce();
+    // ApplyReturnToOriginForce();
 
     if (set_force_) {
       std::lock_guard<std::mutex> lock(val_lock_);
@@ -184,6 +190,22 @@ void HapticDevice::ForceCallback(const geometry_msgs::msg::Vector3::SharedPtr ms
 {
   Eigen::Vector3d f(msg->x, msg->y, msg->z);
   SetForce(f);
+}
+
+void HapticDevice::WrenchCallback(const geometry_msgs::msg::WrenchStamped::SharedPtr msg)
+{
+  Eigen::Vector3d f(msg->wrench.force.x, msg->wrench.force.y, msg->wrench.force.z);
+  filtered_force_feedback_ = 0.03045 * f + (1.0 - 0.03045) * filtered_force_feedback_;
+  for (int i = 0; i < 3; ++i) {
+    filtered_force_feedback_[i] =
+      std::clamp(filtered_force_feedback_[i], -3.0, 3.0);
+  }
+  for (size_t i = 0; i < 3; i++)
+  {
+    std::cout<<filtered_force_feedback_[i]<<", ";
+  }
+  std::cout<<std::endl;
+  SetForce(0.1 * filtered_force_feedback_);
 }
 
 void HapticDevice::SetForce(const Eigen::Vector3d &f_in)

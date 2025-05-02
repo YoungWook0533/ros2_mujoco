@@ -30,7 +30,7 @@ namespace FR3Controller
         bool cartesianViolation(const Isometry3d &T);
         VectorXd generateSafetyTorque(const bool safety_enabled, const Isometry3d &T, const Ref<const VectorXd> &q, const Ref<const VectorXd> &dq, const Ref<const VectorXd> &tau);
 
-        VectorXd KeyboardCtrl(const bool is_mode_changed, const VectorXd& desired_vel);
+        VectorXd KeyboardCtrl(const bool init, const Matrix4d& x_init, const VectorXd& cmd_vel);
 
     private :
         double dt_;

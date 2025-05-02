@@ -10,7 +10,7 @@ from fr3_controller_wrapper_cpp import RobotData as RobotDatacpp
 from fr3_controller_wrapper_cpp import cubic, rotationCubic, Euler2rot, rot2Euler
 from std_msgs.msg import Int32, Int8MultiArray
 from trajectory_msgs.msg import JointTrajectory
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, WrenchStamped
 
 class FR3Controller(ControllerInterface):
     """
@@ -70,7 +70,10 @@ class FR3Controller(ControllerInterface):
         self.robot_data = RobotDatacpp(urdf_path, yaml_path)
         self.controller = Controllercpp(0.001, self.robot_data)
         self.ee_name = "fr3_link8"
-            
+
+        # Wrench publisher
+        self.wrench_pub = self.node.create_publisher(WrenchStamped, '/wrench', 10)
+
     def starting(self) -> None:
         """
         Called once when the controller starts.
@@ -122,6 +125,21 @@ class FR3Controller(ControllerInterface):
         self.J = self.robot_data.getJacobian(self.ee_name)
         self.qdot = self.robot_data.getqdot()
         self.tau = self.robot_data.gettau()
+        self.wrench = self.robot_data.getWrench(self.ee_name)
+
+        msg = WrenchStamped()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = self.ee_name
+        # fill force
+        msg.wrench.force.x  = float(self.wrench[0])
+        msg.wrench.force.y  = float(self.wrench[1])
+        msg.wrench.force.z  = float(self.wrench[2])
+        # fill torque
+        msg.wrench.torque.x = float(self.wrench[3])
+        msg.wrench.torque.y = float(self.wrench[4])
+        msg.wrench.torque.z = float(self.wrench[5])
+
+        self.wrench_pub.publish(msg)
         
     def compute(self) -> None:
         """
@@ -299,7 +317,7 @@ class FR3Controller(ControllerInterface):
             
 
         elif self.mode == 'teleop':
-            self.torque_desired = self.KeyboardCtrl(self.init_keyboard, self.cmd_vel)
+            self.torque_desired = self.KeyboardCtrl(self.init_keyboard, self.x_init_mat, self.cmd_vel)
             self.init_keyboard = False
 
 # *** Python functions ***
@@ -399,7 +417,7 @@ class FR3Controller(ControllerInterface):
         except Exception as e:
             print(f"Error in torque calculation: {e}")
 
-    def KeyboardCtrl(self, init:bool, cmd_vel:np.ndarray) -> np.ndarray:
+    def KeyboardCtrl(self, init:bool, x_init:np.ndarray, cmd_vel:np.ndarray) -> np.ndarray:
         """
         Controller for keyboard teleoperation.
         
@@ -410,7 +428,7 @@ class FR3Controller(ControllerInterface):
             np.ndarray: Torque commands computed by the PD controller.
         """
         try:
-            return self.controller.KeyboardCtrl(init, cmd_vel)
+            return self.controller.KeyboardCtrl(init, x_init, cmd_vel)
         except Exception as e:
             print(f"Error in torque calculation: {e}")
 

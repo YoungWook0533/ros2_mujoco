@@ -402,13 +402,13 @@ namespace FR3Controller
         double z_ee = monitoring_point(2);
 
         // lower plane
-        if(z_ee < safety_plane_z_coordinate)
-        {
-            is_violated = true;
-            std::cout << "WARNING : End effector too low, engaging safety mode" << std::endl;
-            std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;   
-            x_d_.block<3,1>(0,3)(2) = safety_plane_z_coordinate - 0.15;    
-        }
+        // if(z_ee < safety_plane_z_coordinate)
+        // {
+        //     is_violated = true;
+        //     std::cout << "WARNING : End effector too low, engaging safety mode" << std::endl;
+        //     std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;   
+        //     x_d_.block<3,1>(0,3)(2) = safety_plane_z_coordinate - 0.15;    
+        // }
         // cylinder
         if (z_ee < safety_cylinder_height && radius_square < pow(safety_cylinder_radius, 2))
         {
@@ -471,12 +471,12 @@ namespace FR3Controller
     }
 
 
-    VectorXd Controller::KeyboardCtrl(const bool init, const VectorXd& cmd_vel)
+    VectorXd Controller::KeyboardCtrl(const bool init, const Matrix4d& x_init, const VectorXd& cmd_vel)
     {
         // Initialization Block
         if (init) {
-            x_init_ = robot_data_->getPose();  
-            x_d_ = x_init_;
+            // x_init = robot_data_->getPose();  
+            x_d_ = x_init;
         }
 
         double alpha = 0.03045; // 10Hz cutoff frequency
@@ -498,7 +498,7 @@ namespace FR3Controller
         R_d = R_d * DyrosMath::rotateWithY(theta_y_);
         theta_x_ += cmd_vel(3) * dt_;
         R_d = R_d * DyrosMath::rotateWithX(theta_x_);
-        x_d_.block<3,3>(0,0) = R_d * x_init_.block<3,3>(0,0);
+        x_d_.block<3,3>(0,0) = R_d * x_init.block<3,3>(0,0);
 
         VectorXd desired_x(6);
         desired_x.head(3) = x_d_.block<3,1>(0,3);
@@ -508,8 +508,8 @@ namespace FR3Controller
         // std::cout<<"xdot : "<< xdot_.transpose() <<std::endl;
 
         VectorXd xdot_d = VectorXd::Zero(6);
-        // VectorXd tau_desired = PDTaskControl(desired_x, xdot_d);
-        VectorXd tau_desired = QPIK(desired_x, xdot_d);
+        VectorXd tau_desired = PDTaskControl(desired_x, xdot_d);
+        // VectorXd tau_desired = QPIK(desired_x, xdot_d);
 
         VectorXi limited_joints(7);
         limited_joints.setZero();

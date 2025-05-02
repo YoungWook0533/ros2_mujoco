@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
+#include <geometry_msgs/msg/wrench_stamped.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <std_msgs/msg/int8_multi_array.hpp>
 #include <Eigen/Dense>
@@ -32,6 +33,7 @@ private:
   void PublishHapticData();
   void GetHapticDataRun();
   void ForceCallback(const geometry_msgs::msg::Vector3::SharedPtr msg);
+  void WrenchCallback(const geometry_msgs::msg::WrenchStamped::SharedPtr msg);
   void SetForce(const Eigen::Vector3d &force);
   void VerifyForceLimit(Eigen::Vector3d &force);
   void ApplyReturnToOriginForce();
@@ -41,6 +43,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr ori_encoder_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8MultiArray>::SharedPtr button_state_pub_;
+  rclcpp::Subscription<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr force_sub_;
 
   // timing
@@ -63,6 +66,7 @@ private:
 
   // haptic state vectors
   Eigen::Vector3d force_limit_;
+  Eigen::Vector3d filtered_force_feedback_;
   Eigen::Vector3d position_;
   Eigen::Matrix3d orientation_;
   Eigen::Vector3d ori_encoder_;

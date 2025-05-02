@@ -63,6 +63,7 @@ namespace FR3Controller
             VectorXd getTaskCoriolis(const std::string& link_name=ee_name_);
             VectorXd getTaskGravity(const std::string& link_name=ee_name_);
             VectorXd getTaskNonlinearEffects(const std::string& link_name=ee_name_);
+            VectorXd getWrench(const std::string& link_name);
 
         private:
             bool updateKinematics(const VectorXd& q, const VectorXd& qdot);
