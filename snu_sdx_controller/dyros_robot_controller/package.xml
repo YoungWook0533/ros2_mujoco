@@ -1,7 +1,7 @@
 <package format="3">
   <name>dyros_robot_controller</name>
   <version>0.1.0</version>
-  <description>FR3 robot controller with C++ binding and Python interface.</description>
+  <description>FR3, Husky robot controller with C++ binding and Python interface.</description>
   <maintainer email="example@example.com">Your Name</maintainer>
   <license>Apache License 2.0</license>
 

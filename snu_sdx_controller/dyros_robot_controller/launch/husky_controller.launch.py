@@ -6,11 +6,11 @@ from launch.actions import ExecuteProcess
 
 def generate_launch_description():
     """
-    fr3_controller.launch.py:
+    husky_controller.launch.py:
     - mujoco_ros_sim 패키지의 'mujoco_ros_sim' 노드를 실행
     - 파라미터로 'controller_class', 'robot_data_class'를
-      각각 'dyros_controller.fr3_controller.controller.FR3Controller',
-           'dyros_controller.fr3_controller.robot_data.FR3RobotData'
+      각각 'dyros_controller.husky_controller.controller.HuskyController',
+           'dyros_controller.husky_controller.robot_data.HuskyRobotData'
       로 설정
     - 필요한 경우 'robot_name'도 launch argument로 받아서 세팅
     """
@@ -25,13 +25,13 @@ def generate_launch_description():
     # 커스텀 컨트롤러/로봇데이터 클래스 경로
     controller_class_arg = DeclareLaunchArgument(
         'controller_class',
-        default_value='fr3_controller.controller.FR3Controller',
-        description='Python path for FR3Controller'
+        default_value='husky_controller.controller.HuskyController',
+        description='Python path for HuskyController'
     )
     # robot_data_class_arg = DeclareLaunchArgument(
     #     'robot_data_class',
-    #     default_value='dyros_controller.fr3_controller.robot_data.FR3RobotData',
-    #     description='Python path for FR3RobotData'
+    #     default_value='dyros_controller.husky_controller.robot_data.HuskyRobotData',
+    #     description='Python path for HuskyRobotData'
     # )
 
     # 런치에서 참조할 LaunchConfiguration

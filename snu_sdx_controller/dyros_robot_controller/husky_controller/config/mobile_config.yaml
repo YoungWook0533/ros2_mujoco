@@ -1,0 +1,9 @@
+mobile_config:
+  base_width: 0.67 
+  wheel_radius: 0.1651 
+  lin_vel_limit: 1.0
+  ang_vel_limit: 3.0
+  lin_acc_limit: 2.0
+  ang_acc_limit: 6.0
+
+

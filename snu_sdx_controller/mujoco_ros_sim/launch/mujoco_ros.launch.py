@@ -5,21 +5,27 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # 런치 아규먼트들
+    # robot_name_arg = DeclareLaunchArgument(
+    #     'robot_name',
+    #     default_value='franka_fr3_torque',
+    #     description='Name of the robot model to be used in MuJoCo'
+    # )
+
     robot_name_arg = DeclareLaunchArgument(
         'robot_name',
-        default_value='franka_fr3_torque',
+        default_value='husky',
         description='Name of the robot model to be used in MuJoCo'
     )
 
     controller_class_arg = DeclareLaunchArgument(
         'controller_class',
-        default_value='dyros_robot_controller.fr3_controller.controller.FR3Controller',
+        default_value='dyros_robot_controller.husky_controller.controller.HuskyController',
         description='Full Python path of the controller class to load (e.g. my_pkg.my_controller.MyController)'
     )
 
     robot_data_class_arg = DeclareLaunchArgument(
         'robot_data_class',
-        default_value='dyros_robot_controller.fr3_controller.robot_data.FR3RobotData',
+        default_value='dyros_robot_controller.husky_controller.robot_data.HuskyRobotData',
         description='Full Python path of the RobotData class to load (e.g. my_pkg.my_robot_data.MyRobotData)'
     )
 
@@ -54,5 +60,5 @@ def generate_launch_description():
         controller_class_arg,
         robot_data_class_arg,
         sim_node,
-        gui
+        # gui
     ])

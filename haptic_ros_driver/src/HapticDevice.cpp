@@ -198,7 +198,7 @@ void HapticDevice::WrenchCallback(const geometry_msgs::msg::WrenchStamped::Share
   filtered_force_feedback_ = 0.03045 * f + (1.0 - 0.03045) * filtered_force_feedback_;
   for (int i = 0; i < 3; ++i) {
     filtered_force_feedback_[i] =
-      std::clamp(filtered_force_feedback_[i], -3.0, 3.0);
+      std::clamp(filtered_force_feedback_[i], -5.0, 5.0);
   }
   for (size_t i = 0; i < 3; i++)
   {
