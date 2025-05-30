@@ -74,7 +74,8 @@ namespace FR3Controller
         const double safety_plane_z_coordinate = 0.28;
         const double safety_cylinder_radius = 0.28;
         const double safety_cylinder_height = 0.6;
-        bool safety_mode_flag = false;
+        bool joint_safety_mode_flag = false;
+        bool task_safety_mode_flag = false;
         VectorXd limited_joints;
         VectorXd x_dot_lfp_; 
 

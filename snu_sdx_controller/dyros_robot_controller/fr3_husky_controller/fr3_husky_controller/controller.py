@@ -1,25 +1,24 @@
 import numpy as np
 from .utils import tfmatrix_to_array,ControlledThread
 from mujoco_ros_sim import ControllerInterface
-from .robot_data import HuskyRobotData
+from .robot_data import FR3HuskyRobotData
 from rclpy.node import Node
 import os
 from ament_index_python.packages import get_package_share_directory
-from husky_controller_wrapper_cpp import Controller as Controllercpp
-from husky_controller_wrapper_cpp import RobotData as RobotDatacpp
-from sensor_msgs.msg import JointState
+from fr3_husky_controller_wrapper_cpp import Controller as Controllercpp
+from fr3_husky_controller_wrapper_cpp import RobotData as RobotDatacpp
 from geometry_msgs.msg import Twist
 
-class HuskyController(ControllerInterface):
+class FR3HuskyController(ControllerInterface):
     """
-    Controller implementation for the Husky robot.
+    Controller implementation for the FR3Husky robot.
     
-    This controller uses HuskyRobotData to update the robot's state and subscribes to key inputs
+    This controller uses FR3HuskyRobotData to update the robot's state and subscribes to key inputs
     to change the control mode. It computes desired joint positions using cubic spline interpolation
     in an asynchronous thread. The controller provides control commands that are applied to the robot's actuators.
     
     Attributes:
-        robot_data (HuskyRobotData): Instance for managing the Husky robot's data.
+        robot_data (FR3HuskyRobotData): Instance for managing the FR3Husky robot's data.
         is_mode_changed (bool): Flag indicating if the control mode has changed.
         key_subscriber: ROS2 subscription for key input messages.
         q_desired (np.ndarray): Desired joint positions computed by the controller.
@@ -31,7 +30,7 @@ class HuskyController(ControllerInterface):
     
     def __init__(self, node: Node, dt: float, mj_joint_names: list):
         """
-        Initializes the HuskyController.
+        Initializes the FR3HuskyController.
         
         Parameters:
             node (Node): A ROS2 node instance used for logging, subscriptions, and communication.
@@ -45,27 +44,24 @@ class HuskyController(ControllerInterface):
 
         urdf_path = os.path.join(
             get_package_share_directory('dyros_robot_controller'),
-            'husky_controller',
+            'fr3_husky_controller',
             'robot',
-            'husky.urdf'
+            'fr3_husky.urdf'
         )
 
         yaml_path = os.path.join(
             get_package_share_directory('dyros_robot_controller'),
-            'husky_controller',
+            'fr3_husky_controller',
             'config',
             'mobile_config.yaml'
         )
 
-        # self.robot_data = HuskyRobotData(self.node, mj_joint_names)
+        # self.robot_data = FR3HuskyRobotData(self.node, mj_joint_names)
         self.robot_data = RobotDatacpp(urdf_path)
         self.controller = Controllercpp(0.001, self.robot_data, yaml_path)
         self.desired_wheel_vel = np.zeros(4)
         self.target_base_vel = np.zeros(3)
         self.mobile_kv = 50
-
-        # JointState publisher
-        self.joint_state_pub = self.node.create_publisher(JointState, '/joint_states', 10)
 
         self.subscription = self.node.create_subscription(Twist, '/cmd_vel', self.target_velocity_callback, 1)
 
@@ -83,7 +79,7 @@ class HuskyController(ControllerInterface):
     def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray, current_time: float) -> None:
         """
         Updates the controller's state with the latest simulation data.
-        This method updates the internal simulation time, refreshes the robot state via HuskyRobotData,
+        This method updates the internal simulation time, refreshes the robot state via FR3HuskyRobotData,
         and logs the current joint positions for debugging.
         
         Parameters:
@@ -103,7 +99,7 @@ class HuskyController(ControllerInterface):
         wheel_vel = vel[6:]
         wheel_tau = tau[6:]
         
-        # Update the robot's state using the HuskyRobotData interface.
+        # Update the robot's state using the FR3HuskyRobotData interface.
         self.robot_data.updateState(wheel_pose, wheel_vel, wheel_tau)
         
         self.wheel_pose = self.robot_data.getWheelPose()
@@ -111,18 +107,9 @@ class HuskyController(ControllerInterface):
         # self.wheel_torque = self.robot_data.getWheelPose()
         self.current_base_vel = self.controller.FK(self.wheel_vel)
 
-        # Publish jointstate
-        js = JointState()
-        js.header.stamp = self.node.get_clock().now().to_msg()
-        js.name     = self.robot_data.getWheelNames()
-        js.position = list(self.wheel_pose)
-        js.velocity = list(self.wheel_vel)
-        # js.effort   = list(self.tau)
-        self.joint_state_pub.publish(js)
-
     def compute(self) -> None:
         """
-        Computes the control commands for the Husky robot.
+        Computes the control commands for the FR3Husky robot.
         Launches an asynchronous thread to compute the desired joint positions and waits for the
         computation to complete within the allocated simulation time step. If the computation exceeds
         the allowed time, it attempts to forcibly terminate the thread.
@@ -139,7 +126,7 @@ class HuskyController(ControllerInterface):
 
         # If the thread is still running after dt seconds, attempt to kill it.
         if t.is_alive():
-            print("[Huskycontroller] 제한 시간 초과, 스레드 종료 시도")
+            print("[FR3Huskycontroller] 제한 시간 초과, 스레드 종료 시도")
             t.kill()
             
     def getCtrlInput(self) -> tuple[np.ndarray, list]:

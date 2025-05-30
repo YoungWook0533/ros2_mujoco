@@ -29,6 +29,7 @@ include_directories(
 # fr3_controller, husky_controller, etc.
 add_subdirectory(fr3_controller)
 add_subdirectory(husky_controller)
+add_subdirectory(fr3_husky_controller)
 
 # 3) (옵션) Python 설치
 # ament_python_install_package(${PROJECT_NAME})

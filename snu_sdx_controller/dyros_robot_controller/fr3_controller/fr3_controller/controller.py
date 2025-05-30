@@ -10,6 +10,7 @@ from fr3_controller_wrapper_cpp import RobotData as RobotDatacpp
 from fr3_controller_wrapper_cpp import cubic, rotationCubic, Euler2rot, rot2Euler
 from std_msgs.msg import Int32, Int8MultiArray
 from trajectory_msgs.msg import JointTrajectory
+from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist, WrenchStamped
 
 class FR3Controller(ControllerInterface):
@@ -71,6 +72,9 @@ class FR3Controller(ControllerInterface):
         self.controller = Controllercpp(0.001, self.robot_data)
         self.ee_name = "fr3_link8"
 
+        # JointState publisher
+        self.joint_state_pub = self.node.create_publisher(JointState, '/joint_states', 10)
+
         # Wrench publisher
         self.wrench_pub = self.node.create_publisher(WrenchStamped, '/wrench', 10)
 
@@ -127,18 +131,25 @@ class FR3Controller(ControllerInterface):
         self.tau = self.robot_data.gettau()
         self.wrench = self.robot_data.getWrench(self.ee_name)
 
+        # Publish jointstate
+        js = JointState()
+        js.header.stamp = self.node.get_clock().now().to_msg()
+        js.name     = self.robot_data.getJointNames()
+        js.position = list(self.q)
+        js.velocity = list(self.qdot)
+        js.effort   = list(self.tau)
+        self.joint_state_pub.publish(js)
+        
+        # Publish wrench
         msg = WrenchStamped()
         msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.header.frame_id = self.ee_name
-        # fill force
         msg.wrench.force.x  = float(self.wrench[0])
         msg.wrench.force.y  = float(self.wrench[1])
         msg.wrench.force.z  = float(self.wrench[2])
-        # fill torque
         msg.wrench.torque.x = float(self.wrench[3])
         msg.wrench.torque.y = float(self.wrench[4])
         msg.wrench.torque.z = float(self.wrench[5])
-
         self.wrench_pub.publish(msg)
         
     def compute(self) -> None:
@@ -223,8 +234,9 @@ class FR3Controller(ControllerInterface):
 
         if mode == 'teleop':
             self.cmd_vel = np.zeros(6)
-            self.keyboard_subscription = self.node.create_subscription(Twist, '/haptic/twist', self.keyboard_callback, 10)
-            self.button_subscriber = self.node.create_subscription(Int8MultiArray, '/haptic/button_state', self.button_state_callback, 10)
+            self.keyboard_subscription = self.node.create_subscription(Twist, '/keyboard_interface', self.keyboard_callback, 10)
+            # self.keyboard_subscription = self.node.create_subscription(Twist, '/haptic/twist', self.keyboard_callback, 10)
+            # self.button_subscriber = self.node.create_subscription(Int8MultiArray, '/haptic/button_state', self.button_state_callback, 10)
         elif mode == 'cartesian':
             self.target_x = self.x.copy()
             self.target_xdot = np.zeros(6)
@@ -232,11 +244,12 @@ class FR3Controller(ControllerInterface):
             self.ee_trajectory_sub = self.node.create_subscription(JointTrajectory, '/ee_commands', self.ee_callback, 10)
         
     def keyboard_callback(self, msg: Twist):
-        if not self.button_pressed:
-            self.cmd_vel = np.zeros(6)
+        # if not self.button_pressed:
+        #     self.cmd_vel = np.zeros(6)
     
-        else: 
-            self.cmd_vel = np.array([5 * msg.linear.x, 5 * msg.linear.y, 5 * msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
+        # else: 
+        #     self.cmd_vel = np.array([5 * msg.linear.x, 5 * msg.linear.y, 5 * msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
+        self.cmd_vel = np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
 
     def ee_callback(self, msg: JointTrajectory):
         point = msg.points[0]

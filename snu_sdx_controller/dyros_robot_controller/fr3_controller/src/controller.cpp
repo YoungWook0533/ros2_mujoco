@@ -149,7 +149,7 @@ namespace FR3Controller
         // Compute velocity error
         VectorXd xdot_error(6);
         xdot_error = robot_data_->getJacobian() * robot_data_->getqdot() - desired_xdot;
-            
+
         VectorXd tau_task = robot_data_->getJacobian().transpose() * (robot_data_->getTaskMassMatrix() * (-K_T_ * x_error - B_T_ * xdot_error) + robot_data_->getTaskNonlinearEffects());
 
         double lambda = 0.3;
@@ -402,13 +402,13 @@ namespace FR3Controller
         double z_ee = monitoring_point(2);
 
         // lower plane
-        // if(z_ee < safety_plane_z_coordinate)
-        // {
-        //     is_violated = true;
-        //     std::cout << "WARNING : End effector too low, engaging safety mode" << std::endl;
-        //     std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;   
-        //     x_d_.block<3,1>(0,3)(2) = safety_plane_z_coordinate - 0.15;    
-        // }
+        if(z_ee < safety_plane_z_coordinate)
+        {
+            is_violated = true;
+            std::cout << "WARNING : End effector too low, engaging safety mode" << std::endl;
+            std::cout << "position of monitoring point : " << monitoring_point.transpose() << std::endl;   
+            // x_d_.block<3,1>(0,3)(2) = safety_plane_z_coordinate - 0.15;    
+        }
         // cylinder
         if (z_ee < safety_cylinder_height && radius_square < pow(safety_cylinder_radius, 2))
         {
@@ -416,58 +416,136 @@ namespace FR3Controller
             std::cout << "WARNING : End effector too close to center of workspace, engaging safety mode" << std::endl;
             std::cout << "Monitoring point: " << monitoring_point.transpose() << std::endl;
             
-            Vector3d des_pos = x_d_.block<3,1>(0,3);
-            Vector2d xy_des(des_pos(0), des_pos(1));
-            double current_radius = xy_des.norm();
-            if (current_radius < safety_cylinder_radius)
-            {
-                if (current_radius < safety_cylinder_radius - 0.01)
-                {
-                    x_d_.block<3,1>(0,3)(2) = safety_cylinder_height - 0.15;
-                }
-                else
-                {
-                    xy_des = xy_des.normalized() * safety_cylinder_radius;
-                    des_pos(0) = xy_des(0);
-                    des_pos(1) = xy_des(1);
-                    x_d_.block<3,1>(0,3) = des_pos;
-                }   
-            }
+            // Vector3d des_pos = x_d_.block<3,1>(0,3);
+            // Vector2d xy_des(des_pos(0), des_pos(1));
+            // double current_radius = xy_des.norm();
+            // if (current_radius < safety_cylinder_radius)
+            // {
+            //     if (current_radius < safety_cylinder_radius - 0.01)
+            //     {
+            //         x_d_.block<3,1>(0,3)(2) = safety_cylinder_height - 0.15;
+            //     }
+            //     else
+            //     {
+            //         xy_des = xy_des.normalized() * safety_cylinder_radius;
+            //         des_pos(0) = xy_des(0);
+            //         des_pos(1) = xy_des(1);
+            //         x_d_.block<3,1>(0,3) = des_pos;
+            //     }   
+            // }
         }
         
         return is_violated;
     }
 
-    VectorXd Controller::generateSafetyTorque(const bool safety_enabled,
-                                                      const Isometry3d &T,
-                                                      const Ref<const VectorXd> &q,
-                                                      const Ref<const VectorXd> &dq,
-                                                      const Ref<const VectorXd> &tau)
+    // VectorXd Controller::generateSafetyTorque(const bool safety_enabled,
+    //                                                   const Isometry3d &T,
+    //                                                   const Ref<const VectorXd> &q,
+    //                                                   const Ref<const VectorXd> &dq,
+    //                                                   const Ref<const VectorXd> &tau)
+    // {
+    //     bool pos_safty, vel_safty;
+    //     VectorXd torque;
+    //     VectorXd safety_torque;
+
+    //     torque = tau;
+
+    //     pos_safty = positionViolation(q);
+    //     vel_safty = velocityViolation(dq);
+
+    //     if(pos_safty || vel_safty) joint_safety_mode_flag = true;
+    //     // else joint_safety_mode_flag = false;
+
+    //     if (safety_enabled)
+    //     {
+    //         task_safety_mode_flag = cartesianViolation(T);
+
+    //         if(task_safety_mode_flag)
+    //         {
+    //             safety_torque = tau;
+                
+    //             return safety_torque;
+    //         }
+
+    //     }
+    //     return torque;
+    // }
+
+    VectorXd Controller::generateSafetyTorque(bool safety_enabled, const Isometry3d &T, const Ref<const VectorXd> &q, const Ref<const VectorXd> &dq, const Ref<const VectorXd> &tau)
     {
         bool pos_safty, vel_safty;
-        VectorXd torque;
-        VectorXd safety_torque;
 
-        torque = tau;
+        VectorXd tau_safe = tau;
+        if (!safety_enabled) return tau_safe;
 
         pos_safty = positionViolation(q);
         vel_safty = velocityViolation(dq);
 
-        if(pos_safty || vel_safty) safety_mode_flag = true;
+        if(pos_safty || vel_safty) joint_safety_mode_flag = true;
 
         if (safety_enabled)
         {
-            safety_mode_flag = cartesianViolation(T);
+            task_safety_mode_flag = cartesianViolation(T);
 
-            if(safety_mode_flag)
+            if(task_safety_mode_flag)
             {
-                safety_torque = tau;
-                // x_d_ = robot_data_->getPose();
-                return safety_torque;
+                // tuning
+                const double k_rep    = 1000.0;   // N/m
+                const double buf      = 0.05;    // m
+                // const double F_MAX    = 40.0;    // N
+                // const double TAU_MAX  = 10.0;    // Nm
+            
+                // monitoring point
+                Vector3d mp = T.linear()*monitoring_point_ee_frame + T.translation();
+                double dz = mp.z() - safety_plane_z_coordinate;
+                double dz_cylinder = mp.z() - safety_cylinder_height;
+                double r2 = mp.x()*mp.x() + mp.y()*mp.y();
+                double r  = std::sqrt(r2);
+            
+                // only if inside the buffer do we build a small repulsion
+                if (dz < buf || (r < safety_cylinder_radius + buf && dz_cylinder < buf))
+                {
+                    VectorXd F_rep = VectorXd::Zero(6);
+                
+                    // plane
+                    if (dz < buf) {
+                        F_rep.z() = -k_rep*(dz - buf);
+                    }
+                    // cylinder
+                    else if(r < safety_cylinder_radius + buf && dz_cylinder < buf){
+                        if (r < safety_cylinder_radius - 0.01) {
+                            F_rep.z() = -k_rep*(dz_cylinder - buf);
+                        }
+                        else {
+                            double dr = r - (safety_cylinder_radius + buf);
+                            Vector2d dir(mp.x(), mp.y());
+                            dir /= r;
+                            F_rep.x() = -k_rep * dr * dir.x();
+                            F_rep.y() = -k_rep * dr * dir.y();
+                        }
+                    }
+                    
+                
+                    // clamp wrench
+                    // for (int i=0; i<3; ++i) {
+                    //     F_rep[i] = std::clamp(F_rep[i], -F_MAX, F_MAX);
+                    //     std::cout << F_rep[i] << " ";
+                    // }
+                    std::cout << std::endl;
+                
+                    // map into joint‐torque
+                    VectorXd tau_rep = robot_data_->getJacobian().transpose() * F_rep;
+                
+                    // clamp each joint
+                    // for (int i=0; i<tau_rep.size(); ++i)
+                    //     tau_rep[i] = std::clamp(tau_rep[i], -TAU_MAX, TAU_MAX);
+                
+                    tau_safe += tau_rep;
+                }
+            
+                return tau_safe;
             }
-
         }
-        return torque;
     }
 
 
@@ -476,6 +554,7 @@ namespace FR3Controller
         // Initialization Block
         if (init) {
             // x_init = robot_data_->getPose();  
+            joint_safety_mode_flag = false;
             x_d_ = x_init;
         }
 
@@ -508,8 +587,11 @@ namespace FR3Controller
         // std::cout<<"xdot : "<< xdot_.transpose() <<std::endl;
 
         VectorXd xdot_d = VectorXd::Zero(6);
-        VectorXd tau_desired = PDTaskControl(desired_x, xdot_d);
-        // VectorXd tau_desired = QPIK(desired_x, xdot_d);
+        VectorXd qdot_d = VectorXd::Zero(7);
+        VectorXd tau_desired = VectorXd::Zero(6);
+        if(joint_safety_mode_flag) tau_desired = PDJointControl(robot_data_->getq(), qdot_d);
+        // else tau_desired = PDTaskControl(desired_x, xdot_d);
+        tau_desired = QPIK(desired_x, xdot_d);
 
         VectorXi limited_joints(7);
         limited_joints.setZero();
