@@ -31,7 +31,7 @@ namespace FR3Controller
             VectorXd getKp();
             VectorXd getKd();
 
-            bool updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& tau);
+            bool updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& qddot, const VectorXd& tau);
 
             std::vector<std::string> getJointNames() { return joint_names_; }
             VectorXd getq();
@@ -63,6 +63,8 @@ namespace FR3Controller
             VectorXd getTaskCoriolis(const std::string& link_name=ee_name_);
             VectorXd getTaskGravity(const std::string& link_name=ee_name_);
             VectorXd getTaskNonlinearEffects(const std::string& link_name=ee_name_);
+
+            void runMOB(double dt);
             VectorXd getWrench(const std::string& link_name);
 
         private:
@@ -78,6 +80,8 @@ namespace FR3Controller
             // Joint space state
             VectorXd q_;    // joint angle
             VectorXd qdot_; // joint velocity
+            VectorXd qddot_;
+            // VectorXd qdot_prev_;
             VectorXd tau_;  // joint torque
 
             // Task space state
@@ -107,6 +111,17 @@ namespace FR3Controller
             MatrixXd B_T_;
             VectorXd Kp_;
             VectorXd Kd_;
+
+            double  K_mo_        = 25.0;
+            bool    mo_init_     = false;
+            VectorXd p_hat_;
+            VectorXd p0_;
+            MatrixXd M_prev_;
+            bool is_initialized_;
+
+            MatrixXd K0_;
+            VectorXd p_;
+            VectorXd r_;
     };
 }
 

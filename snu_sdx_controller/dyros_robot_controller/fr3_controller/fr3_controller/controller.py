@@ -98,12 +98,8 @@ class FR3Controller(ControllerInterface):
         self.pos_desired = self.x_init[:3]
         self.rot_desired = self.x_init[3:]
         self.torque_desired = self.tau
-
-        # self.target_x = self.x_init
-        # self.target_xdot = np.zeros(6)
-        # self.duration = 2.0
         
-    def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray, current_time: float) -> None:
+    def updateState(self, pos: np.ndarray, vel: np.ndarray, acc: np.ndarray, tau: np.ndarray, current_time: float) -> None:
         """
         Updates the controller's state with the latest simulation data.
         This method updates the internal simulation time, refreshes the robot state via FR3RobotData,
@@ -122,7 +118,7 @@ class FR3Controller(ControllerInterface):
         self.current_time = current_time
         
         # Update the robot's state using the FR3RobotData interface.
-        self.robot_data.updateState(pos, vel, tau)
+        self.robot_data.updateState(pos, vel, acc, tau)
         
         self.q = self.robot_data.getq()
         self.x = tfmatrix_to_array(self.robot_data.getPose(self.ee_name))
@@ -139,7 +135,7 @@ class FR3Controller(ControllerInterface):
         js.velocity = list(self.qdot)
         js.effort   = list(self.tau)
         self.joint_state_pub.publish(js)
-        
+
         # Publish wrench
         msg = WrenchStamped()
         msg.header.stamp = self.node.get_clock().now().to_msg()
@@ -277,7 +273,7 @@ class FR3Controller(ControllerInterface):
         
         # Compute desired joint positions based on the current control mode.
         if self.mode == 'init':
-            target_q = np.array([0, 0, 0, 0, 0, 0, np.pi/4])
+            target_q = np.array([0, 0, 0, -np.pi/2, 0, np.pi, np.pi/4])
             for i in range(7):
                 self.q_desired[i] = cubic(
                     self.current_time,

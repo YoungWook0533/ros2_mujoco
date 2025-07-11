@@ -16,6 +16,8 @@ namespace FR3HuskyController
 
         void loadConfigFromYaml(const std::string& yaml_file);
 
+        VectorXd PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot);
+
         // VectorXd tmpControl();
         VectorXd IK(const Vector3d& desired_base_velocity);
         Vector3d FK(const VectorXd& desired_wheel_vel);
@@ -26,6 +28,12 @@ namespace FR3HuskyController
         RobotData* robot_data_;
 
         std::vector<std::string> wheel_names_;
+
+        MatrixXd M_T_;
+        MatrixXd K_T_;
+        MatrixXd B_T_;
+        VectorXd Kp_;
+        VectorXd Kd_;
 
         double base_width_;
         double wheel_radius_;

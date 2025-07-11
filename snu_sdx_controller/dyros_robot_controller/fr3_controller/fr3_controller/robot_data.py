@@ -64,9 +64,10 @@ class FR3RobotData(RobotDataInterface):
         # with a size corresponding to the number of robot joints.
         self.q = np.zeros(len(self.rb_joint_names))
         self.qdot = np.zeros(len(self.rb_joint_names))
+        self.qddot = np.zeros(len(self.rb_joint_names))
         self.tau = np.zeros(len(self.rb_joint_names))
     
-    def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray):
+    def updateState(self, pos: np.ndarray, vel: np.ndarray, acc: np.ndarray, tau: np.ndarray):
         """
         Updates the internal state of the FR3 robot data using simulation values.
         
@@ -92,11 +93,12 @@ class FR3RobotData(RobotDataInterface):
             self.q[rb_index] = pos[mj_index]
             # Map the simulation joint velocity to the robot data array.
             self.qdot[rb_index] = vel[mj_index]
+            self.qddot[rb_index] = acc[mj_index]
             # Map the simulation joint torque to the robot data array.
             self.tau[rb_index] = tau[mj_index]
         
         # Update the robot_data instance (C++ wrapper) with the new state arrays.
-        if(not self.robot_data.updateState(self.q, self.qdot, self.tau)):
+        if(not self.robot_data.updateState(self.q, self.qdot, self.qddot, self.tau)):
             self.node.get_logger().error("[FR3RobotData] Failed to update robot state.")
 
 # ==================================================================================================

@@ -7,10 +7,12 @@
 
 #include "robot_data.h"
 #include "controller.h"
+#include "math_type_define.h"
 
 namespace bp = boost::python;
 using namespace Eigen;
 using namespace FR3HuskyController;
+using namespace DyrosMath;
 
 // Converter for std::vector<std::string>
 struct VectorString_to_python
@@ -68,10 +70,45 @@ BOOST_PYTHON_MODULE(fr3_husky_controller_wrapper_cpp)
     bp::to_python_converter<std::vector<std::string>, VectorString_to_python>();
     VectorString_from_python();
 
+    // Bind utility functions
+    bp::def("cubic", cubic);
+    bp::def("rotationCubic", static_cast<const Eigen::Matrix3d(*)(double,double,double,const Eigen::Matrix3d&,const Eigen::Matrix3d&)>(&rotationCubic));
+    bp::def("rot2Euler", rot2Euler);
+    bp::def("Euler2rot", Euler2rot);
+
     // Bind RobotData class
-    bp::class_<RobotData, boost::noncopyable>("RobotData", bp::init<std::string>())
+    bp::class_<RobotData, boost::noncopyable>("RobotData", bp::init<std::string, std::string, std::string>())
         .def("updateState", &RobotData::updateState)
+        .def("getJointNames", &RobotData::getJointNames)
         .def("getWheelNames", &RobotData::getWheelNames)
+        .def("getq", &RobotData::getq)
+        .def("getqdot", &RobotData::getqdot)
+        .def("gettau", &RobotData::gettau)
+        .def("computePose", &RobotData::computePose)
+        .def("getPose", &RobotData::getPose)
+        .def("computeJacobian", &RobotData::computeJacobian)
+        .def("getJacobian", &RobotData::getJacobian)
+        .def("computeJacobianTimeVariation", &RobotData::computeJacobianTimeVariation)
+        .def("getJacobianTimeVariation", &RobotData::getJacobianTimeVariation)
+        .def("computeVelocity", &RobotData::computeVelocity)
+        .def("getVelocity", &RobotData::getVelocity)
+        .def("computeMassMatrix", &RobotData::computeMassMatrix)
+        .def("getMassMatrix", &RobotData::getMassMatrix)
+        .def("computeCoriolis", &RobotData::computeCoriolis)
+        .def("getCoriolis", &RobotData::getCoriolis)
+        .def("computeGravity", &RobotData::computeGravity)
+        .def("getGravity", &RobotData::getGravity)
+        .def("computeNonlinearEffects", &RobotData::computeNonlinearEffects)
+        .def("getNonlinearEffects", &RobotData::getNonlinearEffects)
+        .def("computeTaskMassMatrix", &RobotData::computeTaskMassMatrix)
+        .def("getTaskMassMatrix", &RobotData::getTaskMassMatrix)
+        .def("computeTaskCoriolis", &RobotData::computeTaskCoriolis)
+        .def("getTaskCoriolis", &RobotData::getTaskCoriolis)
+        .def("computeTaskGravity", &RobotData::computeTaskGravity)
+        .def("getTaskGravity", &RobotData::getTaskGravity)
+        .def("computeTaskNonlinearEffects", &RobotData::computeTaskNonlinearEffects)
+        .def("getTaskNonlinearEffects", &RobotData::getTaskNonlinearEffects)
+        .def("getWrench", &RobotData::getWrench)
         .def("getWheelPose", &RobotData::getWheelPose)
         .def("getWheelVel", &RobotData::getWheelVel)
         ;
@@ -79,7 +116,7 @@ BOOST_PYTHON_MODULE(fr3_husky_controller_wrapper_cpp)
     // Bind Controller class
     bp::class_<Controller, boost::noncopyable>("Controller", bp::init<double, RobotData*, std::string>())
         .def("loadConfigFromYaml", &Controller::loadConfigFromYaml)
-        // .def("tmpControl", &Controller::tmpControl)
+        .def("PDJointControl", &Controller::PDJointControl)
         .def("IK", &Controller::IK)
         .def("VelocityCommand", &Controller::VelocityCommand)
         .def("FK", &Controller::FK)

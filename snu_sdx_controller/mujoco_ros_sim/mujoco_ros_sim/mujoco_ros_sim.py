@@ -10,6 +10,7 @@ import mujoco.viewer
 # - load_mj_model: loads a MuJoCo model given a robot name.
 # - precise_sleep: a high-precision sleep function to maintain time steps.
 # - load_class dynamically loads a class (e.g., a controller) from a string identifier.
+from geometry_msgs.msg import WrenchStamped
 from .utils import load_mj_model, precise_sleep, load_class
 
 
@@ -69,6 +70,7 @@ class MujocoSimNode(Node):
         self.mj_data = mujoco.MjData(self.mj_model)
         self.dt = self.mj_model.opt.timestep  # Simulation time step (in seconds)
         self.viewer_fps = 60.0  # Target frames per second for GUI updates
+        self.wrench_sensor = np.zeros(6)
         
         # 3) Extract joint names from the model.
         self.joint_names = []
@@ -98,8 +100,50 @@ class MujocoSimNode(Node):
             self.controller = Controller(self, self.dt, self.joint_names)
         else:
             self.controller = None
-
+        self.wrench_pub = self.create_publisher(WrenchStamped, '/wrench_sensor', 1)
         self.get_logger().info(f"Sim node with controller={controller_class_str}")
+
+        self.sensor_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "fr3_sensor")
+        self.base_body_id   = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "base")
+
+    def publish_wrench_sensor(self):
+        wrench_msg = WrenchStamped()
+        wrench_msg.header.stamp = self.get_clock().now().to_msg()
+        wrench_msg.header.frame_id = "fr3_link8"
+
+        # wrench_data = self.controller.getWrench("hand_tcp")
+        wrench_data = self.wrench_sensor
+
+        wrench_msg.wrench.force.x = wrench_data[0]
+        wrench_msg.wrench.force.y = wrench_data[1]
+        wrench_msg.wrench.force.z = wrench_data[2]
+        wrench_msg.wrench.torque.x = wrench_data[3]
+        wrench_msg.wrench.torque.y = wrench_data[4]
+        wrench_msg.wrench.torque.z = wrench_data[5]
+
+        self.wrench_pub.publish(wrench_msg)
+
+    def _sensor_wrench_to_base(self, wrench_s):
+        """Convert [Fx,Fy,Fz,Mx,My,Mz] from sensor frame to base frame."""
+
+        F_s, tau_s = wrench_s[:3], wrench_s[3:]
+
+        # ---- 1. Rotation part ----------------------------------
+        R_ws = self.mj_data.xmat[self.sensor_body_id].reshape(3, 3)  # sensor → world
+        R_wb = self.mj_data.xmat[self.base_body_id].reshape(3, 3)    # base   → world
+        R_bs = R_wb.T @ R_ws                                         # sensor → base
+        F_b   = R_bs @ F_s
+        tau_b = R_bs @ tau_s
+
+        # ---- 2. Moment shift (r × F) ----------------------------
+        p_ws = self.mj_data.xpos[self.sensor_body_id]                # world coords
+        p_wb = self.mj_data.xpos[self.base_body_id]                  # world coords
+        r_bs_world = p_ws - p_wb
+        r_bs = R_wb.T @ r_bs_world                                   # expressed in base
+        tau_b += np.cross(r_bs, F_b)
+
+        return np.concatenate([F_b, tau_b])
+
                 
     def run(self):
         """
@@ -144,7 +188,15 @@ class MujocoSimNode(Node):
                 # tau: array of applied forces (qfrc_applied, including any external forces)
                 pos = np.copy(self.mj_data.qpos)
                 vel = np.copy(self.mj_data.qvel)
+                acc = np.copy(self.mj_data.qacc)
                 tau = np.copy(self.mj_data.qfrc_actuator + self.mj_data.qfrc_applied + self.mj_data.qfrc_constraint)
+                # self.wrench_sensor = self.mj_data.sensordata[0:6]
+                # self.publish_wrench_sensor()
+
+                wrench_raw = self.mj_data.sensordata[0:6]
+                self.wrench_sensor = self._sensor_wrench_to_base(wrench_raw)
+                self.publish_wrench_sensor()
+
                 
                 # Update the controller with the current state.
                 if self.controller is not None:
@@ -154,7 +206,7 @@ class MujocoSimNode(Node):
                     #   - vel: velocities (numpy array)
                     #   - tau: forces (numpy array)
                     #   - current simulation time (float)
-                    self.controller.updateState(pos, vel, tau, self.mj_data.time)
+                    self.controller.updateState(pos, vel, acc, tau, self.mj_data.time)
                     
                     # If this is the first iteration, run the controller's starting routine.
                     if self.is_starting:

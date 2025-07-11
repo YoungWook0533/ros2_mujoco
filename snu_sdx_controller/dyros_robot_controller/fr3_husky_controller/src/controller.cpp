@@ -2,6 +2,8 @@
 #include "robot_data.h"
 #include <cmath>
 #include <yaml-cpp/yaml.h>
+#include <qpOASES.hpp>
+#include "math_type_define.h"
 
 namespace FR3HuskyController
 { 
@@ -11,6 +13,12 @@ namespace FR3HuskyController
         dt_ = dt;
         robot_data_ = rd;
 
+        M_T_ = robot_data_->getMT();
+        K_T_ = robot_data_->getKT();
+        B_T_ = robot_data_->getBT();
+        Kp_ = robot_data_->getKp();
+        Kd_ = robot_data_->getKd();
+
         wheel_names_ = robot_data_->getWheelNames();
         loadConfigFromYaml(yaml_path);
     }
@@ -18,11 +26,6 @@ namespace FR3HuskyController
     Controller::~Controller()
     {
     }
-
-    // VectorXd Controller::tmpControl()
-    // {
-    //     return VectorXd::Zero(7);
-    // }
 
     void Controller::loadConfigFromYaml(const std::string& yaml_file) {
 
@@ -45,6 +48,13 @@ namespace FR3HuskyController
         std::cout << "  lin_acc_limit: " << lin_acc_limit_<< "\n";
         std::cout << "  ang_acc_limit : " << ang_acc_limit_<< "\n";
 
+    }
+
+    VectorXd Controller::PDJointControl(const VectorXd& desired_q, const VectorXd& desired_qdot)
+    {
+        VectorXd qddot_target = Kp_.cwiseProduct(desired_q - robot_data_->getq()) + Kd_.cwiseProduct(desired_qdot - robot_data_->getqdot());
+        VectorXd tau_desired = robot_data_->getMassMatrix() * qddot_target + robot_data_->getNonlinearEffects();
+        return tau_desired;
     }
 
     VectorXd Controller::IK(const Vector3d& desired_base_velocity)

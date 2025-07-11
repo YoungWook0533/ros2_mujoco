@@ -18,6 +18,8 @@ namespace FR3Controller
         // Initialize joint space state
         q_ = VectorXd::Zero(model_.nq);
         qdot_ = VectorXd::Zero(model_.nq);
+        qddot_ = VectorXd::Zero(model_.nq);
+        // qdot_prev_ = VectorXd::Zero(model_.nq);
         tau_ = VectorXd::Zero(model_.nq);
 
         // Initialize task space state
@@ -46,6 +48,13 @@ namespace FR3Controller
         B_T_ = MatrixXd::Zero(6, 6);
         Kp_.resize(model_.nq);
         Kd_.resize(model_.nq);
+
+        p_hat_ = VectorXd::Zero(model_.nq);
+        p0_ = VectorXd::Zero(model_.nq);
+        p_ = VectorXd::Zero(model_.nq);
+        M_prev_ = MatrixXd::Zero(model_.nq, model_.nv);
+        is_initialized_ = false;
+        K0_ = 40 * MatrixXd::Identity(model_.nq, model_.nq);
 
         loadGainsFromYaml(yaml_path);
     }
@@ -100,13 +109,17 @@ namespace FR3Controller
         return Kd_;
     }
 
-    bool RobotData::updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& tau)
+    bool RobotData::updateState(const VectorXd& q, const VectorXd& qdot, const VectorXd& qddot, const VectorXd& tau)
     {
         q_ = q;
         qdot_ = qdot;
+        qddot_ = qddot;
+        // qddot_ = (qdot_ - qdot_prev_) / 0.001;
+        // qdot_prev_ = qdot_;
         tau_ = tau;
         if(!updateKinematics(q_, qdot_)) return false;
         if(!updateDynamics(q_, qdot_)) return false;
+        runMOB(0.001);
         return true;
     }
 
@@ -496,6 +509,25 @@ namespace FR3Controller
         return c_task + g_task;
     }
 
+    void RobotData::runMOB(double dt)
+    {
+        MatrixXd M_dot = (M_ - M_prev_) / dt;
+        M_prev_ = M_;
+
+        VectorXd C_T_qdot = M_dot * qdot_ - c_;
+        VectorXd Beta = g_ - C_T_qdot;
+
+        p_ = M_ * qdot_;
+        if (!is_initialized_) {
+            p0_ = p_;
+            is_initialized_ = true;
+        }
+
+        r_ = K0_ * (p_ - p0_ - p_hat_);
+        VectorXd pdot_hat = tau_ - Beta + r_;
+        p_hat_ += pdot_hat * dt;
+    }
+
     VectorXd RobotData::getWrench(const std::string& link_name)
     {
         pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
@@ -507,9 +539,10 @@ namespace FR3Controller
 
         MatrixXd J_hand = RobotData::getJacobian(link_name);
         MatrixXd J_bar = M_inv_ * J_hand.transpose() * M_ee_;
-        VectorXd tau_ext = tau_ - NLE_;
+        VectorXd tau_model = M_ * qddot_ + c_ + g_;
+        VectorXd tau_ext = tau_ - tau_model;
         VectorXd wrench_ee = J_bar.transpose() * tau_ext;
-
+        
         return wrench_ee;
     }
 }

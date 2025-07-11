@@ -28,6 +28,10 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCL
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 <robot name="fr3_husky">
+
+  <material name="grey">
+    <color rgba="0.2 0.2 0.2 1"/>
+  </material>
   <!-- Base link is the center of the robot's bottom plate -->
   <link name="base_link">
     <visual>
@@ -215,12 +219,114 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
     <child link="imu_link"/>
   </joint>
 
+  <!-- This file is a placeholder which is included by default from
+       husky.urdf.xacro. If a robot is being customized and requires
+       additional URDF, set the HUSKY_URDF_EXTRAS environment variable
+       to the full path of the file you would like included. -->
+  <!-- This file is a placeholder which is included by default from
+       husky.urdf.xacro. If a robot is being customized and requires
+       additional URDF, set the HUSKY_URDF_EXTRAS environment variable
+       to the full path of the file you would like included. -->
+
+  <link name="top_chassis_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://husky_description/meshes/top_chassis.dae" />
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Attach chassis to the robot -->
+  <joint name="top_chassis_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="top_chassis_link" />
+  </joint>
+
+  <link name="front_bumper_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://husky_description/meshes/bumper.dae" />
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="front_bumper" type="fixed">
+    <origin xyz="0.48 0 0.091" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="front_bumper_link" />
+  </joint>
+
+  <link name="rear_bumper_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://husky_description/meshes/bumper.dae" />
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="rear_bumper" type="fixed">
+    <origin xyz="-0.48 0 0.091" rpy="0 0 3.141592" />
+    <parent link="base_link" />
+    <child link="rear_bumper_link" />
+  </joint>
+
+  <link name="user_rail_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://husky_description/meshes/user_rail.dae" />
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="user_rail" type="fixed">
+    <origin xyz="0.272 0 0.245" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="user_rail_link" />
+  </joint>
+
+  <link name="top_plate_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <material name="grey"/>
+      <geometry>
+        <mesh filename="package://husky_description/meshes/roas_dyros.STL" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://husky_description/meshes/roas_dyros.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="top_plate_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="top_plate_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="top_plate_front_link"/>
+  <joint name="top_plate_front_joint" type="fixed">
+    <parent link="top_plate_link" />
+    <child link="top_plate_front_link"/>
+    <origin xyz="0.36367 0 0.00639" rpy="0 0 0"/>
+  </joint>
+
+  <link name="top_plate_rear_link"/>
+  <joint name="top_plate_rear_joint" type="fixed">
+    <parent link="top_plate_link" />
+    <child link="top_plate_rear_link"/>
+    <origin xyz="-0.36633 0 0.00639" rpy="0 0 0"/>
+  </joint>
+
   <!-- FR3 -->
 
   <joint name="fr3_base_joint" type="fixed">
     <parent link="base_link"/>
     <child link="fr3_link0"/>
-    <origin rpy="0 0 0" xyz="0.36 0 0.25"/>
+    <origin rpy="0 0 0" xyz="0.335 0 0.255"/>
   </joint>
   <!-- sub-link defining detailed meshes for collision with environment -->
   <link name="fr3_link0">
@@ -235,11 +341,9 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
       </geometry>
     </collision>
     <inertial>
-      <!-- <origin rpy="0 0 0" xyz="-0.0172 0.0004 0.0745"/> -->
-      <origin rpy="0 0 0" xyz="-0.041018 -0.00014 0.049974"/>
+      <origin rpy="0 0 0" xyz="-0.0172 0.0004 0.0745"/>
       <mass value="2.3966"/>
-      <!-- <inertia ixx="0.009" ixy="0.0" ixz="0.002" iyy="0.0115" iyz="0.0" izz="0.0085"/> -->
-      <inertia ixx="0.00315" ixy="8.2904e-7" ixz="0.00015" iyy="0.00388" iyz="8.2299e-6" izz="0.004285"/>
+      <inertia ixx="0.009" ixy="0.0" ixz="0.002" iyy="0.0115" iyz="0.0" izz="0.0085"/>
     </inertial>
   </link>
   <!-- sub-link defining detailed meshes for collision with environment -->
@@ -254,13 +358,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link1.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="0.0000004128 -0.0181251324 -0.0386035970"/>
       <mass value="2.9274653454"/>
       <inertia ixx="0.023927316485107913" ixy="1.3317903455714081e-05" ixz="-0.00011404774918616684" iyy="0.0224821613275756" iyz="-0.0019950320628240115" izz="0.006350098258530016"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="-0.121059 0.008929 0.021522" xyz="4.128e-07 -0.0181251 -0.0386036"/>
+      <mass value="2.92747"/>
+      <inertia ixx="0.0239286" iyy="0.0227246" izz="0.00610634"/>
+    </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint1" type="revolute">
+  <joint name="fr3_joint1" type="revolute">
     <origin rpy="0 0 0" xyz="0 0 0.333"/>
     <parent link="fr3_link0"/>
     <child link="fr3_link1"/>
@@ -281,13 +392,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link2.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="0.0031828864 -0.0743221644 0.0088146084"/>
       <mass value="2.9355370338"/>
       <inertia ixx="0.041938946257609425" ixy="0.00020257331521090626" ixz="0.004077784227179924" iyy="0.02514514885014724" iyz="-0.0042252158006570156" izz="0.06170214472888839"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="2.142230 -1.351906 -0.520920" xyz="0.00318289 -0.0743222 0.00881461"/>
+      <mass value="2.93554"/>
+      <inertia ixx="0.0629567" iyy="0.0411924" izz="0.0246371"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint2" type="revolute">
+  <joint name="fr3_joint2" type="revolute">
     <origin rpy="-1.570796326794897 0 0" xyz="0 0 0"/>
     <parent link="fr3_link1"/>
     <child link="fr3_link2"/>
@@ -308,13 +426,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link3.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="0.0407015686 -0.0048200565 -0.0289730823"/>
       <mass value="2.2449013699"/>
       <inertia ixx="0.02410142547240885" ixy="0.002404694559042109" ixz="-0.002856269270114313" iyy="0.01974053266708178" iyz="-0.002104212683891874" izz="0.019044494482244823"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="-0.416981 0.426126 0.460289" xyz="0.0407016 -0.00482006 -0.0289731"/>
+      <mass value="2.2449"/>
+      <inertia ixx="0.0267409" iyy="0.0189869" izz="0.0171587"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint3" type="revolute">
+  <joint name="fr3_joint3" type="revolute">
     <origin rpy="1.570796326794897 0 0" xyz="0 -0.316 0"/>
     <parent link="fr3_link2"/>
     <child link="fr3_link3"/>
@@ -335,13 +460,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link4.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="-0.0459100965 0.0630492960 -0.0085187868"/>
       <mass value="2.6155955791"/>
       <inertia ixx="0.03452998321913202" ixy="0.01322552265982813" ixz="0.01015142998484113" iyy="0.028881621933049058" iyz="-0.0009762833870704552" izz="0.04125471171146641"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="1.958885 -0.694393 0.500091" xyz="-0.0459101 0.0630493 -0.00851879"/>
+      <mass value="2.6156"/>
+      <inertia ixx="0.05139" iyy="0.0372717" izz="0.0160047"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint4" type="revolute">
+  <joint name="fr3_joint4" type="revolute">
     <origin rpy="1.570796326794897 0 0" xyz="0.0825 0 0"/>
     <parent link="fr3_link3"/>
     <child link="fr3_link4"/>
@@ -362,13 +494,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link5.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="-0.0016039605 0.0292536262 -0.0972965990"/>
       <mass value="2.3271207594"/>
       <inertia ixx="0.051610278463662895" ixy="-0.005715173387783472" ixz="-0.0035673167625872135" iyy="0.04787729713371481" iyz="0.010673985108535986" izz="0.016423625579357254"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="0.181701 0.232159 -0.736747" xyz="-0.00160396 0.0292536 -0.0972966"/>
+      <mass value="2.32712"/>
+      <inertia ixx="0.0579335" iyy="0.0449144" izz="0.0130634"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint5" type="revolute">
+  <joint name="fr3_joint5" type="revolute">
     <origin rpy="-1.570796326794897 0 0" xyz="-0.0825 0.384 0"/>
     <parent link="fr3_link4"/>
     <child link="fr3_link5"/>
@@ -389,13 +528,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link6.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="0.0597131221 -0.0410294666 -0.0101692726"/>
       <mass value="1.8170376524"/>
       <inertia ixx="0.005412333594383447" ixy="0.006193456360285834" ixz="0.0014219289306117652" iyy="0.014058329545509979" iyz="-0.0013140753741120031" izz="0.016080817924212554"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="1.713686 0.401151 1.141835" xyz="0.0597131 -0.0410295 -0.0101693"/>
+      <mass value="1.81704"/>
+      <inertia ixx="0.0175039" iyy="0.0161123" izz="0.00193529"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint6" type="revolute">
+  <joint name="fr3_joint6" type="revolute">
     <origin rpy="1.570796326794897 0 0" xyz="0 0 0"/>
     <parent link="fr3_link5"/>
     <child link="fr3_link6"/>
@@ -416,13 +562,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
         <mesh filename="package://franka_description/meshes/robot_arms/fr3/collision/link7.stl"/>
       </geometry>
     </collision>
+    <!-- ===================================================== -->
     <inertial>
       <origin rpy="0 0 0" xyz="0.0045225817 0.0086261921 -0.0161633251"/>
       <mass value="0.6271432862"/>
       <inertia ixx="0.00021092389150104718" ixy="-2.433299114461931e-05" ixz="4.564480393778983e-05" iyy="0.00017718568002411474" iyz="8.744070223226438e-05" izz="5.993190599659971e-05"/>
     </inertial>
+    <!-- <inertial>
+      <origin rpy="-0.198385 -0.507582 1.481541" xyz="0.00452258 0.00862619 -0.0161633"/>
+      <mass value="0.627143"/>
+      <inertia ixx="0.000223836" iyy="0.000223642" izz="5.64132e-07"/>
+  </inertial> -->
+    <!-- ===================================================== -->
   </link>
-  <joint name="fr3_mani_joint7" type="revolute">
+  <joint name="fr3_joint7" type="revolute">
     <origin rpy="1.570796326794897 0 0" xyz="0.088 0 0"/>
     <parent link="fr3_link6"/>
     <child link="fr3_link7"/>
@@ -431,130 +584,17 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
     <safety_controller k_position="100.0" k_velocity="40.0" soft_lower_limit="-3.0159" soft_upper_limit="3.0159"/>
     <dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"/>
   </joint>
-  <link name="fr3_link8"/>
-  <joint name="fr3_mani_joint8" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.107"/>
-    <parent link="fr3_link7"/>
-    <child link="fr3_link8"/>
-  </joint>
-  <joint name="fr3_hand_joint" type="fixed">
-    <parent link="fr3_link8"/>
-    <child link="fr3_hand"/>
-    <origin rpy="0 0 -0.7853981633974483" xyz="0 0 0"/>
-  </joint>
-  <!-- sub-link defining detailed meshes for collision with environment -->
-  <link name="fr3_hand">
-    <visual name="fr3_hand_visual">
-      <geometry>
-        <mesh filename="package://franka_description/meshes/robot_ee/franka_hand_white/visual/hand.dae"/>
-      </geometry>
-    </visual>
-    <collision name="fr3_hand_collision">
-      <geometry>
-        <mesh filename="package://franka_description/meshes/robot_ee/franka_hand_white/collision/hand.stl"/>
-      </geometry>
-    </collision>
+  <link name="fr3_link8">
     <inertial>
       <origin rpy="0 0 0" xyz="-0.01 0 0.03"/>
       <mass value="0.73"/>
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.0025" iyz="0" izz="0.0017"/>
     </inertial>
   </link>
-  <!-- Define the hand_tcp frame -->
-  <link name="hand_tcp"/>
-  <joint name="hand_tcp_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.1034"/>
-    <parent link="fr3_hand"/>
-    <child link="hand_tcp"/>
-  </joint>
-  <link name="fr3_leftfinger">
-    <visual name="fr3_leftfinger_visual">
-      <geometry>
-        <mesh filename="package://franka_description/meshes/robot_ee/franka_hand_white/visual/finger.dae"/>
-      </geometry>
-    </visual>
-    <!-- screw mount -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 18.5e-3 11e-3"/>
-      <geometry>
-        <box size="22e-3 15e-3 20e-3"/>
-      </geometry>
-    </collision>
-    <!-- cartriage sledge -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 6.8e-3 2.2e-3"/>
-      <geometry>
-        <box size="22e-3 8.8e-3 3.8e-3"/>
-      </geometry>
-    </collision>
-    <!-- diagonal finger -->
-    <collision>
-      <origin rpy="0.5235987755982988 0 0" xyz="0 15.9e-3 28.35e-3"/>
-      <geometry>
-        <box size="17.5e-3 7e-3 23.5e-3"/>
-      </geometry>
-    </collision>
-    <!-- rubber tip with which to grasp -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 7.58e-3 45.25e-3"/>
-      <geometry>
-        <box size="17.5e-3 15.2e-3 18.5e-3"/>
-      </geometry>
-    </collision>
-  </link>
-  <link name="fr3_rightfinger">
-    <visual name="fr3_rightfinger_visual">
-      <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="package://franka_description/meshes/robot_ee/franka_hand_white/visual/finger.dae"/>
-      </geometry>
-    </visual>
-    <!-- screw mount -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -18.5e-3 11e-3"/>
-      <geometry>
-        <box size="22e-3 15e-3 20e-3"/>
-      </geometry>
-    </collision>
-    <!-- cartriage sledge -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -6.8e-3 2.2e-3"/>
-      <geometry>
-        <box size="22e-3 8.8e-3 3.8e-3"/>
-      </geometry>
-    </collision>
-    <!-- diagonal finger -->
-    <collision>
-      <origin rpy="-0.5235987755982988 0 0" xyz="0 -15.9e-3 28.35e-3"/>
-      <geometry>
-        <box size="17.5e-3 7e-3 23.5e-3"/>
-      </geometry>
-    </collision>
-    <!-- rubber tip with which to grasp -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -7.58e-3 45.25e-3"/>
-      <geometry>
-        <box size="17.5e-3 15.2e-3 18.5e-3"/>
-      </geometry>
-    </collision>
-  </link>
-  <!-- <joint name="fr3_finger_joint1" type="prismatic"> -->
-  <joint name="fr3_finger_joint1" type="fixed">
-    <parent link="fr3_hand"/>
-    <child link="fr3_leftfinger"/>
-    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
-    <axis xyz="0 1 0"/>
-    <limit effort="100" lower="0.0" upper="0.04" velocity="0.2"/>
-    <dynamics damping="0.3"/>
-  </joint>
-  <!-- <joint name="fr3_finger_joint2" type="prismatic"> -->
-  <joint name="fr3_finger_joint2" type="fixed">
-    <parent link="fr3_hand"/>
-    <child link="fr3_rightfinger"/>
-    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
-    <axis xyz="0 -1 0"/>
-    <limit effort="100" lower="0.0" upper="0.04" velocity="0.2"/>
-    <mimic joint="fr3_finger_joint1"/>
-    <dynamics damping="0.3"/>
+  <!-- <link name="fr3_link8"/> -->
+  <joint name="fr3_joint8" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.107"/>
+    <parent link="fr3_link7"/>
+    <child link="fr3_link8"/>
   </joint>
 </robot>

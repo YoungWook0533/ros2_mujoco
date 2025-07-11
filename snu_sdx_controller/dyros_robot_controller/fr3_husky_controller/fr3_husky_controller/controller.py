@@ -1,13 +1,17 @@
 import numpy as np
 from .utils import tfmatrix_to_array,ControlledThread
 from mujoco_ros_sim import ControllerInterface
-from .robot_data import FR3HuskyRobotData
+# from .robot_data import FR3HuskyRobotData
 from rclpy.node import Node
 import os
 from ament_index_python.packages import get_package_share_directory
 from fr3_husky_controller_wrapper_cpp import Controller as Controllercpp
 from fr3_husky_controller_wrapper_cpp import RobotData as RobotDatacpp
-from geometry_msgs.msg import Twist
+from fr3_husky_controller_wrapper_cpp import cubic, rotationCubic, Euler2rot, rot2Euler
+from std_msgs.msg import Int32, Int8MultiArray
+from trajectory_msgs.msg import JointTrajectory
+from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Twist, WrenchStamped
 
 class FR3HuskyController(ControllerInterface):
     """
@@ -42,14 +46,35 @@ class FR3HuskyController(ControllerInterface):
         """
         super().__init__(node, dt, mj_joint_names)
 
-        urdf_path = os.path.join(
+        # urdf_path = os.path.join(
+        #     get_package_share_directory('dyros_robot_controller'),
+        #     'fr3_husky_controller',
+        #     'robot',
+        #     'fr3_husky.urdf'
+        # )
+
+        arm_urdf_path = os.path.join(
             get_package_share_directory('dyros_robot_controller'),
             'fr3_husky_controller',
             'robot',
-            'fr3_husky.urdf'
+            'fr3.urdf'
         )
 
-        yaml_path = os.path.join(
+        base_urdf_path = os.path.join(
+            get_package_share_directory('dyros_robot_controller'),
+            'fr3_husky_controller',
+            'robot',
+            'husky.urdf'
+        )
+
+        gains_path = os.path.join(
+            get_package_share_directory('dyros_robot_controller'),
+            'fr3_husky_controller',
+            'config',
+            'gains.yaml'
+        )
+
+        mobile_config_path = os.path.join(
             get_package_share_directory('dyros_robot_controller'),
             'fr3_husky_controller',
             'config',
@@ -57,13 +82,22 @@ class FR3HuskyController(ControllerInterface):
         )
 
         # self.robot_data = FR3HuskyRobotData(self.node, mj_joint_names)
-        self.robot_data = RobotDatacpp(urdf_path)
-        self.controller = Controllercpp(0.001, self.robot_data, yaml_path)
+        self.robot_data = RobotDatacpp(base_urdf_path, arm_urdf_path, gains_path)
+        self.controller = Controllercpp(0.001, self.robot_data, mobile_config_path)
+        self.ee_name = "fr3_link8"
+
         self.desired_wheel_vel = np.zeros(4)
         self.target_base_vel = np.zeros(3)
         self.mobile_kv = 50
 
+        self.control_input = np.zeros(11)
+
+        self.key_subscriber = self.node.create_subscription(Int32, '/key_input', self.keyCallback, 10)
         self.subscription = self.node.create_subscription(Twist, '/cmd_vel', self.target_velocity_callback, 1)
+
+        self.joint_state_pub = self.node.create_publisher(JointState, '/joint_states', 10)
+        # Wrench publisher
+        self.wrench_pub = self.node.create_publisher(WrenchStamped, '/wrench', 10)
 
     def starting(self) -> None:
         """
@@ -73,7 +107,18 @@ class FR3HuskyController(ControllerInterface):
         Returns:
             None
         """
+        self.is_mode_changed = False
+        self.init_keyboard = False
+        self.mode = 'init'
         self.control_start_time = self.current_time
+        
+        self.q_init = self.q
+        self.x_init_mat = self.robot_data.getPose(self.ee_name)
+        self.x_init = tfmatrix_to_array(self.x_init_mat)
+        self.q_desired = self.q_init
+        self.pos_desired = self.x_init[:3]
+        self.rot_desired = self.x_init[3:]
+        self.torque_desired = self.tau
 
         
     def updateState(self, pos: np.ndarray, vel: np.ndarray, tau: np.ndarray, current_time: float) -> None:
@@ -95,17 +140,33 @@ class FR3HuskyController(ControllerInterface):
         self.current_time = current_time
 
         # Skip floating joints
-        wheel_pose = pos[6:]
-        wheel_vel = vel[6:]
-        wheel_tau = tau[6:]
+        real_pose = pos[6:]
+        real_vel = vel[6:]
+        real_tau = tau[6:]
         
         # Update the robot's state using the FR3HuskyRobotData interface.
-        self.robot_data.updateState(wheel_pose, wheel_vel, wheel_tau)
+        self.robot_data.updateState(real_pose, real_vel, real_tau)
+
+        self.q = self.robot_data.getq()
+        self.x = tfmatrix_to_array(self.robot_data.getPose(self.ee_name))
+        self.J = self.robot_data.getJacobian(self.ee_name)
+        self.qdot = self.robot_data.getqdot()
+        self.tau = self.robot_data.gettau()
+        self.wrench = self.robot_data.getWrench(self.ee_name)
         
         self.wheel_pose = self.robot_data.getWheelPose()
         self.wheel_vel = self.robot_data.getWheelVel()
-        # self.wheel_torque = self.robot_data.getWheelPose()
+        self.wheel_torque = np.zeros(4)
         self.current_base_vel = self.controller.FK(self.wheel_vel)
+
+        # Publish jointstate
+        js = JointState()
+        js.header.stamp = self.node.get_clock().now().to_msg()
+        js.name     = self.robot_data.getWheelNames() + self.robot_data.getJointNames()
+        js.position = list(self.wheel_pose) + list(self.q)
+        js.velocity = list(self.wheel_vel) + list(self.qdot)
+        js.effort   = list(self.wheel_torque) + list(self.tau)
+        self.joint_state_pub.publish(js)
 
     def compute(self) -> None:
         """
@@ -138,11 +199,60 @@ class FR3HuskyController(ControllerInterface):
                 - np.ndarray: Array containing the desired joint positions (control commands).
                 - list: List of robot joint names corresponding to the control commands.
         """
-        return self.desired_wheel_vel, self.robot_data.getWheelNames()
+        return self.control_input, self.robot_data.getWheelNames()+self.robot_data.getJointNames()
     
     # =============================================================================================
     def target_velocity_callback(self, msg):
         self.target_base_vel = np.array([msg.linear.x, msg.linear.y, msg.angular.z])
+
+    def keyCallback(self, msg: Int32):
+        """
+        Callback function for key input messages.
+        If a message with data value 1 is received, the control mode is set to 'home'.
+        
+        Parameters:
+            msg (Int32): The received key input message containing an integer.
+            
+        Returns:
+            None
+        """
+        self.node.get_logger().info(f"[FR3Controller] Key input received: {msg.data}")
+        if msg.data == 1:
+            self.setMode('init')
+        elif msg.data == 2:
+            self.setMode('home')
+                    
+    def setMode(self, mode: str):
+        """
+        Sets the current control mode and flags that a mode change has occurred.
+        Also logs the mode change.
+        
+        Parameters:
+            mode (str): The new control mode (e.g., 'home').
+            
+        Returns:
+            None
+        """
+        self.is_mode_changed = True
+        self.node.get_logger().info(f"[FR3Controller] Mode changed: {mode}")
+        self.mode = mode
+        
+    def keyboard_callback(self, msg: Twist):
+        # if not self.button_pressed:
+        #     self.cmd_vel = np.zeros(6)
+    
+        # else: 
+        #     self.cmd_vel = np.array([5 * msg.linear.x, 5 * msg.linear.y, 5 * msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
+        self.cmd_vel = np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z])
+
+    def ee_callback(self, msg: JointTrajectory):
+        point = msg.points[0]
+        self.target_x     = np.array(point.positions)
+        self.target_xdot = np.array(point.velocities)
+        self.duration     = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+
+        # reset interpolation
+        self.is_mode_changed     = True
 
     def asyncCalculationProc(self):
         """
@@ -151,12 +261,51 @@ class FR3HuskyController(ControllerInterface):
         # print(self.current_base_vel)
         desired_wheel_vel = self.controller.VelocityCommand(self.target_base_vel, self.current_base_vel)
         self.desired_wheel_vel = (desired_wheel_vel - self.wheel_vel) * self.mobile_kv
-        print("-----------------------------------------------------")
-        print(self.target_base_vel)
-        print(self.current_base_vel)
-        print(desired_wheel_vel)
-        print(self.wheel_vel)
-        print("-----------------------------------------------------")
+        # print("-----------------------------------------------------")
+        # print(self.target_base_vel)
+        # print(self.current_base_vel)
+        # print(desired_wheel_vel)
+        # print(self.wheel_vel)
+        # print("-----------------------------------------------------")
+
+        if self.is_mode_changed:
+            self.q_init = self.q
+            self.x_init_mat = self.robot_data.getPose(self.ee_name)
+            self.x_init = tfmatrix_to_array(self.x_init_mat)
+            self.control_start_time = self.current_time
+            self.init_keyboard = True
+            self.is_mode_changed = False
+        
+        # Compute desired joint positions based on the current control mode.
+        if self.mode == 'init':
+            target_q = np.array([0, 0, 0, 0, 0, 0, np.pi/4])
+            for i in range(7):
+                self.q_desired[i] = cubic(
+                    self.current_time,
+                    self.control_start_time,
+                    self.control_start_time + 2.0,
+                    self.q_init[i],
+                    target_q[i],
+                    0.0,  # initial velocity (assumed zero)
+                    0.0   # final velocity (assumed zero)
+                )
+            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7))
+        elif self.mode == 'home':
+            target_q = np.array([0, 0, 0, -np.pi/2, 0, np.pi/2, np.pi/4])
+            for i in range(7):
+                self.q_desired[i] = cubic(
+                    self.current_time,
+                    self.control_start_time,
+                    self.control_start_time + 2.0,
+                    self.q_init[i],
+                    target_q[i],
+                    0.0,  # initial velocity (assumed zero)
+                    0.0   # final velocity (assumed zero)
+                )
+            self.torque_desired = self.PDJointControl(self.q_desired, np.zeros(7))
+
+        # self.torque_desired = [0,1,2,3,4,5,6]
+        self.control_input = np.hstack((self.desired_wheel_vel, self.torque_desired))
 
     # *** Python functions ***
 
@@ -189,4 +338,22 @@ class FR3HuskyController(ControllerInterface):
             np.ndarray: Torque commands computed by the PD controller.
         """
         return self.controller.VelocityCommand(desired_base_vel, current_base_vel)
+    
+    def PDJointControl(self, q_desired:np.ndarray, qdot_desired:np.ndarray) -> np.ndarray:
+        """
+        PD control law for joint position and velocity tracking.
+        
+        Parameters:
+            q_desired (np.ndarray): Desired joint positions.
+            qdot_desired (np.ndarray): Desired joint velocities.
+            kp (float): Proportional gain for position control.
+            kd (float): Derivative gain for velocity control.
+            
+        Returns:
+            np.ndarray: Torque commands computed by the PD controller.
+        """
+        try:
+            return self.controller.PDJointControl(q_desired, qdot_desired)
+        except Exception as e:
+            print(f"Error in torque calculation: {e}")
     

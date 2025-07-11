@@ -46,6 +46,25 @@ def generate_launch_description():
             default_value='dyros_robot_controller.husky_controller.robot_data.HuskyRobotData',
             description='Full Python path of the RobotData class to load (e.g. my_pkg.my_robot_data.MyRobotData)'
         )
+    elif(robot == 'fr3_husky'):
+
+        robot_name_arg = DeclareLaunchArgument(
+            'robot_name',
+            default_value='fr3_husky',
+            description='Name of the robot model to be used in MuJoCo'
+        )
+
+        controller_class_arg = DeclareLaunchArgument(
+            'controller_class',
+            default_value='dyros_robot_controller.fr3_husky_controller.controller.FR3HuskyController',
+            description='Full Python path of the controller class to load (e.g. my_pkg.my_controller.MyController)'
+        )
+
+        robot_data_class_arg = DeclareLaunchArgument(
+            'robot_data_class',
+            default_value='dyros_robot_controller.fr3_controller.robot_data.FR3HuskyRobotData',
+            description='Full Python path of the RobotData class to load (e.g. my_pkg.my_robot_data.MyRobotData)'
+        )
     
     # LaunchConfiguration 객체
     robot_name = LaunchConfiguration('robot_name')

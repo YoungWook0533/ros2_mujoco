@@ -489,59 +489,59 @@ namespace FR3Controller
 
             if(task_safety_mode_flag)
             {
-                // tuning
-                const double k_rep    = 1000.0;   // N/m
-                const double buf      = 0.05;    // m
-                // const double F_MAX    = 40.0;    // N
-                // const double TAU_MAX  = 10.0;    // Nm
+                // // tuning
+                // const double k_rep    = 300.0;   // N/m
+                // const double buf      = 0.05;    // m
+                // // const double F_MAX    = 40.0;    // N
+                // // const double TAU_MAX  = 10.0;    // Nm
             
-                // monitoring point
-                Vector3d mp = T.linear()*monitoring_point_ee_frame + T.translation();
-                double dz = mp.z() - safety_plane_z_coordinate;
-                double dz_cylinder = mp.z() - safety_cylinder_height;
-                double r2 = mp.x()*mp.x() + mp.y()*mp.y();
-                double r  = std::sqrt(r2);
+                // // monitoring point
+                // Vector3d mp = T.linear()*monitoring_point_ee_frame + T.translation();
+                // double dz = mp.z() - safety_plane_z_coordinate;
+                // double dz_cylinder = mp.z() - safety_cylinder_height;
+                // double r2 = mp.x()*mp.x() + mp.y()*mp.y();
+                // double r  = std::sqrt(r2);
             
-                // only if inside the buffer do we build a small repulsion
-                if (dz < buf || (r < safety_cylinder_radius + buf && dz_cylinder < buf))
-                {
-                    VectorXd F_rep = VectorXd::Zero(6);
+                // // only if inside the buffer do we build a small repulsion
+                // if (dz < buf || (r < safety_cylinder_radius + buf && dz_cylinder < buf))
+                // {
+                //     VectorXd F_rep = VectorXd::Zero(6);
                 
-                    // plane
-                    if (dz < buf) {
-                        F_rep.z() = -k_rep*(dz - buf);
-                    }
-                    // cylinder
-                    else if(r < safety_cylinder_radius + buf && dz_cylinder < buf){
-                        if (r < safety_cylinder_radius - 0.01) {
-                            F_rep.z() = -k_rep*(dz_cylinder - buf);
-                        }
-                        else {
-                            double dr = r - (safety_cylinder_radius + buf);
-                            Vector2d dir(mp.x(), mp.y());
-                            dir /= r;
-                            F_rep.x() = -k_rep * dr * dir.x();
-                            F_rep.y() = -k_rep * dr * dir.y();
-                        }
-                    }
+                //     // plane
+                //     if (dz < buf) {
+                //         F_rep.z() = -k_rep*(dz - buf);
+                //     }
+                //     // cylinder
+                //     else if(r < safety_cylinder_radius + buf && dz_cylinder < buf){
+                //         if (r < safety_cylinder_radius - 0.01) {
+                //             F_rep.z() = -k_rep*(dz_cylinder - buf);
+                //         }
+                //         else {
+                //             double dr = r - (safety_cylinder_radius + buf);
+                //             Vector2d dir(mp.x(), mp.y());
+                //             dir /= r;
+                //             F_rep.x() = -k_rep * dr * dir.x();
+                //             F_rep.y() = -k_rep * dr * dir.y();
+                //         }
+                //     }
                     
                 
-                    // clamp wrench
-                    // for (int i=0; i<3; ++i) {
-                    //     F_rep[i] = std::clamp(F_rep[i], -F_MAX, F_MAX);
-                    //     std::cout << F_rep[i] << " ";
-                    // }
-                    std::cout << std::endl;
+                //     // clamp wrench
+                //     // for (int i=0; i<3; ++i) {
+                //     //     F_rep[i] = std::clamp(F_rep[i], -F_MAX, F_MAX);
+                //     //     std::cout << F_rep[i] << " ";
+                //     // }
+                //     // std::cout << std::endl;
                 
-                    // map into joint‐torque
-                    VectorXd tau_rep = robot_data_->getJacobian().transpose() * F_rep;
+                //     // map into joint‐torque
+                //     VectorXd tau_rep = robot_data_->getJacobian().transpose() * F_rep;
                 
-                    // clamp each joint
-                    // for (int i=0; i<tau_rep.size(); ++i)
-                    //     tau_rep[i] = std::clamp(tau_rep[i], -TAU_MAX, TAU_MAX);
+                //     // clamp each joint
+                //     // for (int i=0; i<tau_rep.size(); ++i)
+                //     //     tau_rep[i] = std::clamp(tau_rep[i], -TAU_MAX, TAU_MAX);
                 
-                    tau_safe += tau_rep;
-                }
+                //     tau_safe += tau_rep;
+                // }
             
                 return tau_safe;
             }
@@ -589,8 +589,8 @@ namespace FR3Controller
         VectorXd xdot_d = VectorXd::Zero(6);
         VectorXd qdot_d = VectorXd::Zero(7);
         VectorXd tau_desired = VectorXd::Zero(6);
-        if(joint_safety_mode_flag) tau_desired = PDJointControl(robot_data_->getq(), qdot_d);
-        // else tau_desired = PDTaskControl(desired_x, xdot_d);
+        // if(joint_safety_mode_flag) tau_desired = PDJointControl(robot_data_->getq(), qdot_d);
+        // tau_desired = PDTaskControl(desired_x, xdot_d);
         tau_desired = QPIK(desired_x, xdot_d);
 
         VectorXi limited_joints(7);
